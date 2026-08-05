@@ -79,6 +79,53 @@
   }
 
   /**
+   * Fallback URL source for feeds that expose NO permalink anchor — notably the
+   * "Most Recommended" sort, where the social-bar/image links are placeholder
+   * `/feed/` hrefs. LinkedIn still embeds the post's activity id in a base64
+   * protobuf that prefixes the card's comment-tools element id, e.g.
+   *   id="CgsIg…-replaceableCommentTools<cardToken>FeedType_MAIN_FEED_RELEVANCE"
+   * The protobuf is `0a <len> 08 <varint>`, and the varint is (activityId << 1).
+   * Verified against a known post (activity URN opened the correct article) and
+   * cross-checked on a Most Recent card. Used only as a fallback so real anchors
+   * (which we trust more) always win. BigInt throughout — ids exceed 2^53.
+   */
+  function activityUrlFromToken(card) {
+    const el = card.querySelector(
+      '[id*="-replaceableCommentTools"], [componentkey*="-replaceableCommentTools"]'
+    );
+    if (!el) return null;
+    const raw = el.getAttribute("id") || el.getAttribute("componentkey") || "";
+    const m = raw.match(/^([A-Za-z0-9+/]+)-replaceableCommentTools/); // base64 prefix
+    if (!m) return null;
+    let bytes;
+    try {
+      const b64 = m[1];
+      const bin = atob(b64 + "===".slice((b64.length + 3) % 4));
+      bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    } catch (e) {
+      return null;
+    }
+    // protobuf: <tag> <len> 08 <varint> -> { fieldN: { field1: activityId<<1 } }
+    // The outer tag is 0x0a (field 1) for normal posts but 0x12 (field 2) for
+    // reposts and some others — both are wire type 2. Accept any wire-type-2 tag.
+    if ((bytes[0] & 0x07) !== 2 || bytes[2] !== 0x08) return null;
+    let i = 3;
+    let shift = 0n;
+    let val = 0n;
+    while (i < bytes.length) {
+      const b = bytes[i++];
+      val |= BigInt(b & 0x7f) << shift;
+      if ((b & 0x80) === 0) break;
+      shift += 7n;
+    }
+    const id = val >> 1n;
+    // Sanity gate: current activity ids are 19-digit (~7e18). Reject garbage so
+    // an encoding change fails closed (no button) rather than opening junk.
+    if (id < 1000000000000000000n || id >= 10000000000000000000n) return null;
+    return location.origin + "/feed/update/urn:li:activity:" + id.toString() + "/";
+  }
+
+  /**
    * Find the permalink for the post that owns the given overflow button by
    * walking ancestors until one contains a post link — always the *closest*
    * ancestor, so we never grab a neighbouring post's URL.
@@ -87,8 +134,8 @@
    * cap as a fallback. Without this, a card that has no permalink of its own
    * (e.g. the "Most Recommended" feed sort) would make the walk climb into a
    * shared feed container and return the FIRST post link in the whole feed — so
-   * every button resolved to the same wrong post. Bounded, it returns null and
-   * we simply show no button rather than a wrong one.
+   * every button resolved to the same wrong post. If no anchor is found in the
+   * card, we fall back to decoding the activity id from the card's token.
    */
   function findPostUrl(overflowBtn) {
     const card = overflowBtn.closest('[role="listitem"]');
@@ -104,7 +151,8 @@
       node = node.parentElement;
       depth++;
     }
-    return null;
+    // No permalink anchor in the card — try the embedded activity-id token.
+    return card ? activityUrlFromToken(card) : null;
   }
 
   const SVG_NS = "http://www.w3.org/2000/svg";
@@ -200,7 +248,18 @@
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      window.open(url, "_blank", "noopener,noreferrer");
+      // Open via the service worker, which honors the user's default (set in the
+      // options page) and can place the tab in the background — window.open from
+      // a content script can't. ⌘/Ctrl-click inverts the default for one click.
+      const toggle = e.metaKey || e.ctrlKey;
+      try {
+        chrome.runtime.sendMessage({ type: "lnt-open", url, toggle }, () => {
+          void chrome.runtime.lastError; // swallow "no receiver" noise
+        });
+      } catch (err) {
+        // Extension context gone (e.g. just reloaded) — fall back to a normal tab.
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
     });
     return btn;
   }

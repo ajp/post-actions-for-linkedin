@@ -6,7 +6,7 @@ on its own page in a new tab — no more digging into **… → Copy link to thi
 
 <p>
   <img alt="Manifest V3" src="https://img.shields.io/badge/Manifest-V3-blue">
-  <img alt="Permissions: none" src="https://img.shields.io/badge/permissions-none-brightgreen">
+  <img alt="No host permissions" src="https://img.shields.io/badge/host_permissions-none-brightgreen">
   <img alt="No tracking" src="https://img.shields.io/badge/tracking-none-brightgreen">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-informational">
 </p>
@@ -29,17 +29,18 @@ out interesting posts into tabs and keep scrolling.
 
 ## Features
 
-- **One click, new tab** — opens the post's canonical permalink.
+- **One click, new tab** — opens the post's canonical permalink. Opens in the
+  **background** by default; hold **⌘/Ctrl** to open in the foreground.
 - **Native look** — the button is cloned from the post's own `…` button, so it
   matches LinkedIn's size, spacing, hover circle, and **theme color** (follows the
   in-app dark/light toggle live, no reload).
-- **Works across feed layouts** — home feed, profile posts, activity pages, and
-  social-proof cards ("X commented / likes this"), including the main feed's
-  URL-encoded permalinks.
+- **Works across feed layouts** — home feed (both **Most Recent** and **Most
+  Recommended** sort), profile posts, activity pages, and social-proof cards
+  ("X commented / likes this"), including the main feed's URL-encoded permalinks.
 - **Locale-friendly** — detects the `…` button by its stable icon, not only the
   English label, so non-English UIs work too. Comment menus are ignored.
-- **Private & light** — **no permissions**, **no network calls**, **no storage**,
-  **no data collection**. Just a content script.
+- **Private & light** — one low-risk permission (`storage`, for your preference),
+  **no host permissions**, **no network calls**, **no data collection**.
 
 ## Install
 
@@ -54,6 +55,13 @@ out interesting posts into tabs and keep scrolling.
    open-in-new-tab icon next to its `…` menu.
 
 Works in any Chromium browser (Chrome, Edge, Brave, Arc) that supports Manifest V3.
+
+## Settings
+
+Open the options page from `chrome://extensions` → this extension → **Details →
+Extension options** (or right-click the toolbar icon → **Options**). You can choose
+whether clicking the icon opens the post in a **background** tab (default) or a
+**foreground** tab. Hold **⌘/Ctrl** while clicking to do the opposite for one click.
 
 ## How it works
 
@@ -74,6 +82,16 @@ The content script decodes whichever form it finds and reconstructs the canonica
 `/feed/update/urn:li:<type>:<id>/` URL — no menu interaction, no scraping of
 LinkedIn's randomized, per-build class names.
 
+On **Most Recommended**, cards expose no permalink at all — the links are
+placeholder `/feed/` hrefs. As a fallback, the extension decodes the post's
+activity id from a base64 protobuf token LinkedIn embeds in the card (it stores
+`activityId << 1`), sanity-checks it, and builds the permalink. If anything looks
+off, it shows no button rather than a wrong one.
+
+The click is handled by a tiny **service worker** so it can open the tab in the
+background (`chrome.tabs.create({ active: false })`) — something a content
+script's `window.open` can't do. This needs **no** extra permissions.
+
 For each post it:
 
 1. Finds the `…` (overflow) button — by `aria-label` **and** by the overflow
@@ -87,11 +105,13 @@ For each post it:
 
 ## Privacy
 
-This extension collects nothing and talks to nothing. It runs only on
-`https://www.linkedin.com/*`, requests **no** permissions and **no** host
-permissions beyond that content-script match, makes **no** network requests, and
-uses **no** storage. All it does is read a URL already present in the page and add
-a button that calls `window.open`.
+This extension collects nothing and sends nothing anywhere. It runs only on
+`https://www.linkedin.com/*`, with **no host permissions** beyond that
+content-script match and **no** network requests. Its single permission is
+`storage`, used only to remember your background/foreground preference (via
+`chrome.storage.sync`); nothing else is stored. All it does is derive a post's URL
+from the page and, when you click, open that URL in a new tab (via
+`chrome.tabs.create`, which needs no permission).
 
 ## Project layout
 
@@ -99,6 +119,8 @@ a button that calls `window.open`.
 | --------------- | ---------------------------------------------------------- |
 | `manifest.json` | MV3 manifest; injects the content script on LinkedIn.      |
 | `content.js`    | Finds permalinks and injects the icon button.              |
+| `background.js` | Service worker; opens the tab (background/foreground).     |
+| `options.html` / `options.js` | Settings page (default tab behavior).        |
 | `styles.css`    | Minimal button styling.                                    |
 | `icons/`        | Toolbar / store icons (16, 48, 128).                       |
 | `docs/`         | Screenshots for this README.                               |
