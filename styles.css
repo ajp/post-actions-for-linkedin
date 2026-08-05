@@ -1,0 +1,10 @@
+/* Our button is a clone of the post's own … (overflow) button, so it inherits
+   LinkedIn's native size, alignment, spacing and hover circle.
+
+   The glyph's color/size are set INLINE with !important in content.js (an inline
+   !important beats each route's `svg path { fill: <token> } !important` rule,
+   which was otherwise winning the cascade and hiding the icon). So there's
+   nothing to style here beyond the cursor. */
+.lnt-open-btn {
+  cursor: pointer;
+}
