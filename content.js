@@ -82,16 +82,27 @@
    * Find the permalink for the post that owns the given overflow button by
    * walking ancestors until one contains a post link — always the *closest*
    * ancestor, so we never grab a neighbouring post's URL.
+   *
+   * The walk is BOUNDED to the post's own card (role="listitem"), with a depth
+   * cap as a fallback. Without this, a card that has no permalink of its own
+   * (e.g. the "Most Recommended" feed sort) would make the walk climb into a
+   * shared feed container and return the FIRST post link in the whole feed — so
+   * every button resolved to the same wrong post. Bounded, it returns null and
+   * we simply show no button rather than a wrong one.
    */
   function findPostUrl(overflowBtn) {
+    const card = overflowBtn.closest('[role="listitem"]');
     let node = overflowBtn.parentElement;
-    while (node && node !== document.body) {
+    let depth = 0;
+    while (node && node !== document.body && depth < 12) {
       const links = node.querySelectorAll(POST_HREF);
       for (const link of links) {
         const url = extractPostUrl(link.getAttribute("href"));
         if (url) return url;
       }
+      if (card && node === card) break; // reached the post card — don't go above it
       node = node.parentElement;
+      depth++;
     }
     return null;
   }
