@@ -13,12 +13,24 @@ on its own page in a new tab — no more digging into **… → Copy link to thi
 
 ## Screenshots
 
-> _Placeholders — drop the images below into `docs/` with these exact names and
-> they'll render here._
+The same post in light and dark mode — the injected icon matches LinkedIn's
+native controls in both themes:
 
-| Feed post with the button | Hover state |
+![The same LinkedIn post shown side by side in light and dark mode, each with the open-in-new-tab icon next to the … menu](docs/screenshot-feed.png)
+
+| Hover state | Settings popup |
 | --- | --- |
-| ![The open-in-new-tab icon sits left of the … menu on a feed post](docs/screenshot-feed.png) | ![Hover state of the injected button](docs/screenshot-hover.png) |
+| ![The icon hovered, showing its focus ring and "Open this post in a new tab" tooltip](docs/screenshot-hover.png) | ![Popup to choose whether posts open in a background or foreground tab](docs/screenshot-options.png) |
+
+<details>
+<summary>Permissions (extension details)</summary>
+
+Site access is limited to `linkedin.com`; the only permission is `storage`
+(for your background/foreground preference).
+
+![Extension details page showing version 1.1.0 and site access limited to https://www.linkedin.com/*](docs/screenshot-permissions.png)
+
+</details>
 
 ## Why
 

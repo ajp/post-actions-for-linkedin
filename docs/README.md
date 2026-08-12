@@ -1,12 +1,10 @@
 # Screenshots
 
-Drop images here with these exact names so the main
-[`README.md`](../README.md) renders them:
+Images used by the main [`README.md`](../README.md):
 
-| File | What to capture |
+| File | Shows |
 | --- | --- |
-| `screenshot-feed.png` | A feed post showing the open-in-new-tab icon next to the `…` menu. |
-| `screenshot-hover.png` | The injected button hovered (native hover circle visible). |
-
-PNG preferred. A width around 800–1200px looks good on GitHub. Once added,
-commit and push — the README images will appear automatically.
+| `screenshot-feed.png` | The same post in light + dark, icon next to the `…` menu. |
+| `screenshot-hover.png` | The icon's hover state (focus ring + tooltip). |
+| `screenshot-options.png` | The settings popup (background vs foreground tab). |
+| `screenshot-permissions.png` | Extension details — site access limited to `linkedin.com`. |
