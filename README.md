@@ -18,9 +18,13 @@ native controls in both themes:
 
 ![The same LinkedIn post shown side by side in light and dark mode, each with the open-in-new-tab icon next to the … menu](docs/screenshot-feed.png)
 
-| Hover state | Settings popup |
-| --- | --- |
-| ![The icon hovered, showing its focus ring and "Open this post in a new tab" tooltip](docs/screenshot-hover.png) | ![Popup to choose whether posts open in a background or foreground tab](docs/screenshot-options.png) |
+Hover state — the button shows a native focus ring in both themes:
+
+![The open-in-new-tab icon hovered on a post in light mode and in dark mode, each showing LinkedIn's native focus ring](docs/screenshot-hover.png)
+
+Choose whether posts open in a background or foreground tab:
+
+<p><img src="docs/screenshot-options.png" alt="Settings popup to choose background vs foreground tab" width="330"></p>
 
 <details>
 <summary>Permissions (extension details)</summary>

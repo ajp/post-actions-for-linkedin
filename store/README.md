@@ -13,6 +13,7 @@ Promotional images and listing copy for submitting this extension to the
 | `promo-screenshot-2-1280x800.png` | 1280×800 | Screenshot 2 — light & dark |
 | `promo-screenshot-3-1280x800.png` | 1280×800 | Screenshot 3 — settings |
 | `promo-screenshot-4-1280x800.png` | 1280×800 | Screenshot 4 — privacy |
+| `promo-screenshot-5-1280x800.png` | 1280×800 | Screenshot 5 — works on every kind of post |
 
 At least one 1280×800 (or 640×400) screenshot is required; up to 5 are allowed.
 
