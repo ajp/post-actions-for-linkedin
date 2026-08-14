@@ -22,19 +22,15 @@ Hover state — the button shows a native focus ring in both themes:
 
 ![The open-in-new-tab icon hovered on a post in light mode and in dark mode, each showing LinkedIn's native focus ring](docs/screenshot-hover.png)
 
-Choose whether posts open in a background or foreground tab:
+Choose whether posts open in a background or foreground tab — and note the
+permissions: site access is limited to `linkedin.com`, with only the `storage`
+permission (for your preference).
 
-<p><img src="docs/screenshot-options.png" alt="Settings popup to choose background vs foreground tab" width="330"></p>
-
-<details>
-<summary>Permissions (extension details)</summary>
-
-Site access is limited to `linkedin.com`; the only permission is `storage`
-(for your background/foreground preference).
-
-![Extension details page showing version 1.1.0 and site access limited to https://www.linkedin.com/*](docs/screenshot-permissions.png)
-
-</details>
+<p>
+  <img src="docs/screenshot-options.png" alt="Settings popup to choose background vs foreground tab" height="360">
+  &nbsp;&nbsp;
+  <img src="docs/screenshot-permissions.png" alt="Extension details page showing version 1.1.0 and site access limited to https://www.linkedin.com/*" height="360">
+</p>
 
 ## Why
 
