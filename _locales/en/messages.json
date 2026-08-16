@@ -1,0 +1,6 @@
+{
+  "openPostInNewTab": {
+    "message": "Open this post in a new tab",
+    "description": "Tooltip and accessible label for the injected open-in-new-tab button on each feed post."
+  }
+}

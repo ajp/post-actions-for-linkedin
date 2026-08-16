@@ -19,7 +19,7 @@ At least one 1280×800 (or 640×400) screenshot is required; up to 5 are allowed
 
 ## Listing copy
 
-**Name:** LinkedIn Open Post in New Tab
+**Name:** Open Post in New Tab for LinkedIn
 
 **Summary** (≤132 chars):
 > Adds an open-in-new-tab button to every LinkedIn feed post — one click opens the post's permalink in a new tab. No tracking.
@@ -42,6 +42,8 @@ At least one 1280×800 (or 640×400) screenshot is required; up to 5 are allowed
 > Private by design: no tracking, no data collection, no network calls. Site
 > access is limited to linkedin.com, and the only permission is “storage”, used
 > solely to remember your background/foreground preference.
+>
+> Not affiliated with, endorsed by, or sponsored by LinkedIn Corporation.
 
 ## Privacy / review form answers
 

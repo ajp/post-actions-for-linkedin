@@ -42,7 +42,7 @@ out interesting posts into tabs and keep scrolling.
 ## Features
 
 - **One click, new tab** — opens the post's canonical permalink. Opens in the
-  **background** by default; hold **⌘/Ctrl** to open in the foreground.
+  **background** by default; hold **⌘/Ctrl** to do the opposite for one click.
 - **Native look** — the button is cloned from the post's own `…` button, so it
   matches LinkedIn's size, spacing, hover circle, and **theme color** (follows the
   in-app dark/light toggle live, no reload).

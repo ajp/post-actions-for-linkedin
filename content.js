@@ -21,6 +21,15 @@
 
   const DEBUG = false; // set true to log, in console, why a post gets no button
   const PROCESSED_ATTR = "data-lnt-processed"; // marks an overflow button we've handled
+
+  // Timing / limit knobs, grouped so the virtualization-retry model is visible
+  // in one place. See each use site below for why the value is what it is.
+  const SCAN_RETRY_MS = [400, 1200, 2500]; // ladder of rescans after the first pass
+  const URL_RETRY_GIVEUP_MS = 4000; // stop re-walking a card that never gets a permalink
+  const STALE_SELECTOR_WARN_MS = 5000; // delay before the one-time "selector stale" warning
+  const MAX_WALK_DEPTH = 12; // ancestor-walk cap when hunting a card's permalink
+  const GAP_MEASURE_RETRIES = 5; // equalizeGap re-measures this many times if layout isn't ready
+  const GAP_MEASURE_RETRY_MS = 200;
   // Identify a post's … (overflow) button. Primary signal is the localized
   // aria-label; we ALSO match the overflow icon's stable svg id so non-English
   // locales (where the label is translated) still work. Comment overflow buttons
@@ -141,7 +150,7 @@
     const card = overflowBtn.closest('[role="listitem"]');
     let node = overflowBtn.parentElement;
     let depth = 0;
-    while (node && node !== document.body && depth < 12) {
+    while (node && node !== document.body && depth < MAX_WALK_DEPTH) {
       const links = node.querySelectorAll(POST_HREF);
       for (const link of links) {
         const url = extractPostUrl(link.getAttribute("href"));
@@ -177,8 +186,13 @@
     const btn = overflowBtn.cloneNode(true);
     btn.classList.add("lnt-open-btn");
     btn.setAttribute("type", "button");
-    btn.setAttribute("title", "Open this post in a new tab");
-    btn.setAttribute("aria-label", "Open this post in a new tab");
+    // Localized via _locales when a translation exists; falls back to English if
+    // chrome.i18n is unavailable or the message is missing for the UI locale.
+    const label =
+      (chrome.i18n && chrome.i18n.getMessage("openPostInNewTab")) ||
+      "Open this post in a new tab";
+    btn.setAttribute("title", label);
+    btn.setAttribute("aria-label", label);
     btn.removeAttribute("aria-haspopup");
     btn.removeAttribute("aria-expanded");
     btn.removeAttribute("componentkey");
@@ -237,13 +251,13 @@
       (btn.querySelector("span") || btn).appendChild(svg);
     }
 
-    // Our button goes to the LEFT of …/X and must sit flush against them at the
-    // right edge, consistently across both header layouts. Make OUR button the
-    // single left push point (margin-inline-start:auto); processOverflowButton
-    // then zeroes the inline-start margins on the buttons to our right so no
-    // competing auto margin opens a gap between the icons.
+    // Our button leads the …/X trio and must sit flush against them at the
+    // inline-end edge, consistently across both header layouts. Make OUR button
+    // the single push point (margin-inline-start:auto); processOverflowButton
+    // then zeroes the inline-start margins on the buttons after us so no
+    // competing auto margin opens a gap between the icons. Logical (inline-*)
+    // margins only — physical margin-left would fight this under RTL locales.
     btn.style.setProperty("margin-inline-start", "auto", "important");
-    btn.style.setProperty("margin-left", "auto", "important");
 
     btn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -295,7 +309,7 @@
         first = now;
         overflowBtn.setAttribute("data-lnt-first", String(now));
       }
-      if (now - first > 4000) overflowBtn.setAttribute(PROCESSED_ATTR, "1");
+      if (now - first > URL_RETRY_GIVEUP_MS) overflowBtn.setAttribute(PROCESSED_ATTR, "1");
       if (DEBUG) {
         const found = [];
         let n = overflowBtn.parentElement;
@@ -322,7 +336,6 @@
     for (let sib = overflowBtn; sib; sib = sib.nextElementSibling) {
       if (sib.tagName === "BUTTON") {
         sib.style.setProperty("margin-inline-start", "0", "important");
-        sib.style.setProperty("margin-left", "0", "important");
       }
     }
     // Make the ours↔… gap equal the native …↔X gap. LinkedIn's exact spacing
@@ -330,25 +343,42 @@
     equalizeGap(btn, overflowBtn);
   }
 
-  /** Set our button's end margin so ours↔… spacing matches the native …↔X gap. */
-  function equalizeGap(iconBtn, dotsBtn) {
+  /** Positive gap between two horizontally-adjacent boxes, regardless of which
+   *  is on the left (so the math holds under both LTR and RTL locales). */
+  function gapBetween(a, b) {
+    return Math.max(a.left, b.left) - Math.min(a.right, b.right);
+  }
+
+  /** Set our button's inline-end margin so ours↔… spacing matches the native
+   *  …↔X gap. Uses direction-agnostic gaps and the logical inline-end margin so
+   *  it's correct in RTL too. Re-measures a bounded number of times if the card
+   *  isn't laid out yet (e.g. injected while collapsed) rather than giving up. */
+  function equalizeGap(iconBtn, dotsBtn, attempt = 0) {
     const next = dotsBtn.nextElementSibling;
     if (!next || next.tagName !== "BUTTON") return; // no X to match against
     requestAnimationFrame(() => {
       try {
+        if (!iconBtn.isConnected) return; // removed by a re-render — nothing to do
         const dots = dotsBtn.getBoundingClientRect();
         const nextRect = next.getBoundingClientRect();
         const iconRect = iconBtn.getBoundingClientRect();
         // Not laid out yet (hidden tab / display:none card) → rects are zero.
-        // Bail without writing; a later scan re-measures once layout exists.
-        if (!dots.width || !nextRect.width || !iconRect.width) return;
-        const targetGap = nextRect.left - dots.right; // …↔X
-        const currentGap = dots.left - iconRect.right; // ours↔…
-        const cur =
-          parseFloat(getComputedStyle(iconBtn).marginInlineEnd) || 0;
+        // Retry a bounded number of times so the gap is measured once real
+        // layout exists, instead of staying unequalized for the card's life.
+        if (!dots.width || !nextRect.width || !iconRect.width) {
+          if (attempt < GAP_MEASURE_RETRIES) {
+            setTimeout(
+              () => equalizeGap(iconBtn, dotsBtn, attempt + 1),
+              GAP_MEASURE_RETRY_MS
+            );
+          }
+          return;
+        }
+        const targetGap = gapBetween(dots, nextRect); // native …↔X
+        const currentGap = gapBetween(iconRect, dots); // ours↔…
+        const cur = parseFloat(getComputedStyle(iconBtn).marginInlineEnd) || 0;
         const end = Math.max(0, cur + (targetGap - currentGap));
         iconBtn.style.setProperty("margin-inline-end", end + "px", "important");
-        iconBtn.style.setProperty("margin-right", end + "px", "important");
       } catch (e) {
         /* leave as-is */
       }
@@ -373,7 +403,7 @@
   // Initial pass, plus a short ladder of retries to catch cards whose permalink
   // streams in a beat after their header (in case mutations are sparse).
   scan();
-  [400, 1200, 2500].forEach((ms) => setTimeout(scan, ms));
+  SCAN_RETRY_MS.forEach((ms) => setTimeout(scan, ms));
 
   // One-time breakage signal: if we're on a feed-ish page but injected nothing,
   // LinkedIn likely renamed the overflow selector — make that observable.
@@ -388,7 +418,7 @@
           "buttons — the post detection may be out of date."
       );
     }
-  }, 5000);
+  }, STALE_SELECTOR_WARN_MS);
 
   // The feed is virtualized and streams content in. Only schedule a scan when a
   // mutation actually adds an overflow button OR a post link (a late-arriving
