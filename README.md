@@ -149,3 +149,8 @@ from the page and, when you click, open that URL in a new tab (via
 ## License
 
 [MIT](LICENSE) © AJ Penninga
+
+---
+
+*Not affiliated with, endorsed by, or sponsored by LinkedIn Corporation. "LinkedIn"
+is a trademark of LinkedIn Corporation.*
