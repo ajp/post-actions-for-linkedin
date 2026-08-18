@@ -610,11 +610,21 @@
     document.documentElement.classList.toggle("lnt-suppress-menu", !!on);
   }
 
-  /** Dismiss the menu we opened, then reveal menus again one frame later so the
-   *  menu we drove never flashes on its way open OR closed. */
+  /** Dismiss the menu we opened, then reveal menus again only once the one we
+   *  drove has actually left the DOM — so it never flashes on its way out (after
+   *  Copy, LinkedIn closes it a beat later, async). Bounded so a menu that never
+   *  unmounts can't leave us stuck hidden. */
   function endMenuInteraction() {
     dismissMenu();
-    setTimeout(() => suppressMenus(false), 60);
+    let tries = 0;
+    const reveal = () => {
+      if (!document.querySelector('[role="menu"]') || ++tries > 40) {
+        suppressMenus(false);
+      } else {
+        setTimeout(reveal, 30);
+      }
+    };
+    setTimeout(reveal, 30);
   }
 
   /** Close any open dropdown by sending Escape (artdeco menus listen for it). */
