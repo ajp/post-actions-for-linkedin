@@ -408,6 +408,50 @@
     setTimeout(tick, SAVE_MENU_POLL_MS);
   }
 
+  /**
+   * Copy the post's link via LinkedIn's own "Copy link to post" menu item,
+   * which yields the canonical lnkd.in short link. We prefer this over our
+   * derived permalink because the derived URN is wrong for some cards (e.g.
+   * social-proof "X likes this"), where it resolves to "Post not found". Opens
+   * the (hidden) … menu, clicks the item matched by its stable link-* icon, and
+   * lets LinkedIn write the clipboard. Falls back to copying the derived URL if
+   * the item can't be found.
+   */
+  function copyViaMenu(btn, label, fallbackUrl) {
+    const parent = btn.parentElement;
+    const overflowBtn = parent && parent.querySelector(OVERFLOW_SELECTOR);
+    if (!overflowBtn) {
+      if (fallbackUrl) copyLink(fallbackUrl, btn, label);
+      return;
+    }
+    suppressMenus(true); // hide the dropdown before it paints
+    try {
+      overflowBtn.click(); // open the … dropdown (mounts async, but hidden)
+    } catch (e) {
+      suppressMenus(false);
+      if (fallbackUrl) copyLink(fallbackUrl, btn, label);
+      return;
+    }
+    let tries = 0;
+    const tick = () => {
+      const icon = document.querySelector('[role="menu"] svg[id^="link-"]');
+      const item = icon && icon.closest('[role="menuitem"]');
+      if (item) {
+        item.click(); // LinkedIn copies the canonical link to the clipboard
+        flashCopied(btn, label);
+        endMenuInteraction();
+        return;
+      }
+      if (++tries < SAVE_MENU_TRIES) {
+        setTimeout(tick, SAVE_MENU_POLL_MS);
+      } else {
+        endMenuInteraction();
+        if (fallbackUrl) copyLink(fallbackUrl, btn, label); // menu missing → derived URL
+      }
+    };
+    setTimeout(tick, SAVE_MENU_POLL_MS);
+  }
+
   /** The open … menu's Save item, identified by its bookmark icon (covers both
    *  the "Save" (bookmark-outline) and "Unsave" (bookmark-fill) states). */
   function findSaveMenuItem() {
@@ -539,6 +583,9 @@
     const openLabel = msg("openPostInNewTab", "Open this post in a new tab");
     const copyLabel = msg("copyLinkToPost", "Copy link to this post");
     const saveLabel = msg("savePost", "Save this post");
+    // On the post's own permalink page we're already here, so Open is redundant.
+    const pageUrl = extractPostUrl(location.href);
+    const onOwnPage = pageUrl !== null && pageUrl === url;
     const actions = [
       {
         className: "lnt-save-btn",
@@ -551,15 +598,20 @@
         className: "lnt-copy-btn",
         label: copyLabel,
         iconD: ICON_PATHS.copy,
-        onClick: (e, btn) => copyLink(url, btn, copyLabel),
+        // Copy the link from LinkedIn's own "Copy link to post" menu item (its
+        // canonical lnkd.in link) rather than our derived permalink, which is
+        // wrong for some cards; falls back to the derived URL if unavailable.
+        onClick: (e, btn) => copyViaMenu(btn, copyLabel, url),
       },
-      {
+    ];
+    if (!onOwnPage) {
+      actions.push({
         className: "lnt-open-btn",
         label: openLabel,
         iconD: ICON_PATHS.open,
         onClick: (e) => openInNewTab(url, e),
-      },
-    ];
+      });
+    }
     const ours = actions.map((a) => makeIconButton(overflowBtn, a));
     // Insert in order just before … → [save][copy][open][…][X].
     ours.forEach((b) => overflowBtn.parentElement.insertBefore(b, overflowBtn));
@@ -581,10 +633,9 @@
 
     // If this is the main post on its own permalink page, read its saved state
     // once from the … menu so an already-saved post shows a filled bookmark on
-    // load. extractPostUrl(location) is null on the feed, so this never fires
-    // there — only the page whose URN matches this card. ours[0] is Save.
-    const pageUrl = extractPostUrl(location.href);
-    if (pageUrl && pageUrl === url) {
+    // load. onOwnPage is false on the feed, so this never fires there — only the
+    // page whose URN matches this card. ours[0] is Save.
+    if (onOwnPage) {
       primeSavedState(ours[0], saveLabel);
     }
   }
