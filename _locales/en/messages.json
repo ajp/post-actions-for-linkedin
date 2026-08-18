@@ -15,8 +15,8 @@
     "message": "Save this post",
     "description": "Tooltip and accessible label for the injected save button on each feed post."
   },
-  "savedConfirmation": {
-    "message": "Saved ✓",
-    "description": "Transient tooltip shown on the save button right after the post is saved."
+  "savedState": {
+    "message": "Saved — click to remove",
+    "description": "Tooltip shown on the save button while the post is saved (filled bookmark)."
   }
 }

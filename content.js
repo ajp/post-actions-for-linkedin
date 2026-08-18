@@ -340,6 +340,18 @@
     }, COPY_FEEDBACK_MS);
   }
 
+  /** Reflect saved/unsaved on the save button: filled bookmark = saved (stays
+   *  filled), outline = not saved. We track our own optimistic toggle since the
+   *  post's saved state isn't readable without opening the menu. */
+  function setSavedState(btn, saved, label) {
+    const path = btn.querySelector("svg path");
+    if (path) path.setAttribute("d", saved ? ICON_PATHS.saveDone : ICON_PATHS.save);
+    btn.setAttribute("data-lnt-saved", saved ? "1" : "0");
+    const t = saved ? msg("savedState", "Saved — click to remove") : label;
+    btn.setAttribute("title", t);
+    btn.setAttribute("aria-label", t);
+  }
+
   /** Convenience wrapper: flash the copy button's checkmark. */
   function flashCopied(btn, label) {
     flashAction(
@@ -377,14 +389,11 @@
     const tick = () => {
       const item = findSaveMenuItem();
       if (item) {
-        item.click(); // triggers LinkedIn's own Save; it closes the menu itself
-        flashAction(
-          btn,
-          ICON_PATHS.saveDone,
-          ICON_PATHS.save,
-          msg("savedConfirmation", "Saved ✓"),
-          label
-        );
+        item.click(); // triggers LinkedIn's own Save/Unsave; closes the menu itself
+        // Optimistically toggle our own saved state: not-saved → saved (stays
+        // filled), saved → not-saved (back to outline).
+        const nowSaved = btn.getAttribute("data-lnt-saved") !== "1";
+        setSavedState(btn, nowSaved, label);
         dismissMenu(); // belt-and-suspenders in case it didn't auto-close
         return;
       }
