@@ -165,13 +165,22 @@
   }
 
   const SVG_NS = "http://www.w3.org/2000/svg";
-  const COPY_FEEDBACK_MS = 1200; // how long the copy button flashes "Copied ✓"
-  // Toolbar glyph paths, all on a 16x16 viewBox to match LinkedIn's own icons.
+  const COPY_FEEDBACK_MS = 1200; // how long a button flashes its "done" glyph
+  const SAVE_MENU_TRIES = 10; // poll attempts to find the Save item after opening …
+  const SAVE_MENU_POLL_MS = 100; // delay between those attempts
+  // Toolbar glyphs. Most are on a 16x16 viewBox to match LinkedIn's own icons;
+  // Save reuses LinkedIn's native bookmark glyph, which is authored at 24x24
+  // (setGlyph scales it to a 16px box via the per-icon viewBox).
   const ICON_PATHS = {
     open: "M9 1v2h2.59L6.3 8.29l1.41 1.41L13 4.41V7h2V1zM11 13H3V5h4V3H3a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9h-2z",
     copy: "M5.5 3.5A1.5 1.5 0 0 1 7 2h5a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 12 12h-.5v-1H12a.5.5 0 0 0 .5-.5v-7A.5.5 0 0 0 12 3H7a.5.5 0 0 0-.5.5V4h-1v-.5zM3.5 5A1.5 1.5 0 0 0 2 6.5v7A1.5 1.5 0 0 0 3.5 15h5A1.5 1.5 0 0 0 10 13.5v-7A1.5 1.5 0 0 0 8.5 5h-5zM3 6.5A.5.5 0 0 1 3.5 6h5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-.5.5h-5a.5.5 0 0 1-.5-.5v-7z",
     check: "M13.5 4.5l-7 7L3 8l1-1 2.5 2.5L12.5 3.5z",
+    // LinkedIn's own bookmark-outline glyph (matches the menu's Save item).
+    save: "M19 5a3 3 0 0 0-3-3H5v20l7-6.29L19 22zm-3-1a1 1 0 0 1 1 1v12.51L12 13l-5 4.51V4z",
+    // Filled bookmark, shown briefly after a successful save (24x24 like save).
+    saveDone: "M19 5a3 3 0 0 0-3-3H5v20l7-6.29L19 22z",
   };
+  const ICON_VIEWBOX = { save: "0 0 24 24", saveDone: "0 0 24 24" }; // default 0 0 16 16
   // Native LinkedIn icons paint with fill="currentColor", so currentColor is the
   // theme-correct color and it FOLLOWS LinkedIn's in-app dark/light toggle (which
   // doesn't reload the page). Set inline with !important so it still beats each
@@ -194,11 +203,11 @@
    * !important beats any stylesheet !important regardless of specificity/order.
    * Returns the <path> so callers can flip the glyph later (copy feedback).
    */
-  function setGlyph(btn, d) {
+  function setGlyph(btn, d, viewBox = "0 0 16 16") {
     const oldSvg = btn.querySelector("svg");
     const svg = document.createElementNS(SVG_NS, "svg");
     svg.setAttribute("xmlns", SVG_NS);
-    svg.setAttribute("viewBox", "0 0 16 16");
+    svg.setAttribute("viewBox", viewBox);
     svg.setAttribute("aria-hidden", "true");
     svg.setAttribute("width", "16"); // intrinsic size backstop
     svg.setAttribute("height", "16");
@@ -237,7 +246,7 @@
    * chasing per-layout CSS against randomized class names. Inter-button spacing
    * is set later by layoutToolbar(); this only builds the node.
    */
-  function makeIconButton(overflowBtn, { className, label, iconD, onClick }) {
+  function makeIconButton(overflowBtn, { className, label, iconD, iconViewBox, onClick }) {
     const btn = overflowBtn.cloneNode(true);
     btn.classList.add("lnt-action-btn", className);
     btn.setAttribute("type", "button");
@@ -262,7 +271,7 @@
     // centering flex wrapper and shoves our glyph off-center. Drop it.
     btn.querySelectorAll("[data-dynamic-icon-loading]").forEach((el) => el.remove());
 
-    setGlyph(btn, iconD);
+    setGlyph(btn, iconD, iconViewBox);
 
     btn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -317,16 +326,98 @@
     }
   }
 
-  /** Briefly show a checkmark + "Copied" on the copy button, then restore it. */
-  function flashCopied(btn, label) {
+  /** Briefly swap a button's glyph + tooltip to a "done" state, then restore it.
+   *  Only the path `d` changes, so donePath/restorePath must share the button's
+   *  viewBox (copy uses 16x16 glyphs, save uses LinkedIn's 24x24 bookmark). */
+  function flashAction(btn, donePath, restorePath, doneTitle, restoreTitle) {
     const path = btn.querySelector("svg path");
-    if (path) path.setAttribute("d", ICON_PATHS.check);
-    btn.setAttribute("title", msg("copiedConfirmation", "Copied ✓"));
+    if (path) path.setAttribute("d", donePath);
+    btn.setAttribute("title", doneTitle);
     clearTimeout(btn._lntFlash);
     btn._lntFlash = setTimeout(() => {
-      if (path) path.setAttribute("d", ICON_PATHS.copy);
-      btn.setAttribute("title", label);
+      if (path) path.setAttribute("d", restorePath);
+      btn.setAttribute("title", restoreTitle);
     }, COPY_FEEDBACK_MS);
+  }
+
+  /** Convenience wrapper: flash the copy button's checkmark. */
+  function flashCopied(btn, label) {
+    flashAction(
+      btn,
+      ICON_PATHS.check,
+      ICON_PATHS.copy,
+      msg("copiedConfirmation", "Copied ✓"),
+      label
+    );
+  }
+
+  /**
+   * Save the post to the member's real LinkedIn "Saved" items. LinkedIn exposes
+   * Save only inside the … menu (lazily rendered on click), so we drive its own
+   * control rather than reverse-engineering the private save endpoint: open the
+   * menu, click the item whose icon is the bookmark glyph, then dismiss. Matching
+   * on the stable `bookmark-*` svg id (not the localized "Save" text) keeps it
+   * locale-independent and fail-closed — if we can't find it, we do nothing but
+   * close the menu.
+   */
+  function saveViaMenu(btn, label) {
+    // Resolve the … button live from our toolbar's parent: React can replace the
+    // native node on re-render, so a captured reference may be detached (its
+    // .click() would then no-op). Our clones don't match OVERFLOW_SELECTOR
+    // (different glyph/label), so the header's only match is the real … button.
+    const parent = btn.parentElement;
+    const overflowBtn = parent && parent.querySelector(OVERFLOW_SELECTOR);
+    if (!overflowBtn) return;
+    try {
+      overflowBtn.click(); // open the … dropdown (mounts async)
+    } catch (e) {
+      return;
+    }
+    let tries = 0;
+    const tick = () => {
+      const item = findSaveMenuItem();
+      if (item) {
+        item.click(); // triggers LinkedIn's own Save; it closes the menu itself
+        flashAction(
+          btn,
+          ICON_PATHS.saveDone,
+          ICON_PATHS.save,
+          msg("savedConfirmation", "Saved ✓"),
+          label
+        );
+        dismissMenu(); // belt-and-suspenders in case it didn't auto-close
+        return;
+      }
+      if (++tries < SAVE_MENU_TRIES) {
+        setTimeout(tick, SAVE_MENU_POLL_MS);
+      } else {
+        dismissMenu(); // gave up — don't leave the menu hanging open
+      }
+    };
+    setTimeout(tick, SAVE_MENU_POLL_MS);
+  }
+
+  /** The open … menu's Save item, identified by its bookmark icon (covers both
+   *  the "Save" (bookmark-outline) and "Unsave" (bookmark-fill) states). */
+  function findSaveMenuItem() {
+    const icons = document.querySelectorAll('[role="menu"] svg[id^="bookmark-"]');
+    for (const icon of icons) {
+      const item = icon.closest('[role="menuitem"]');
+      if (item) return item;
+    }
+    return null;
+  }
+
+  /** Close any open dropdown by sending Escape (artdeco menus listen for it). */
+  function dismissMenu() {
+    try {
+      const opts = { key: "Escape", code: "Escape", keyCode: 27, which: 27, bubbles: true };
+      (document.activeElement || document.body).dispatchEvent(
+        new KeyboardEvent("keydown", opts)
+      );
+    } catch (e) {
+      /* nothing else to do */
+    }
   }
 
   function processOverflowButton(overflowBtn) {
@@ -385,7 +476,15 @@
     // glyph and handler. Add more actions here (e.g. Save) and they slot in.
     const openLabel = msg("openPostInNewTab", "Open this post in a new tab");
     const copyLabel = msg("copyLinkToPost", "Copy link to this post");
+    const saveLabel = msg("savePost", "Save this post");
     const actions = [
+      {
+        className: "lnt-save-btn",
+        label: saveLabel,
+        iconD: ICON_PATHS.save,
+        iconViewBox: ICON_VIEWBOX.save,
+        onClick: (e, btn) => saveViaMenu(btn, saveLabel),
+      },
       {
         className: "lnt-copy-btn",
         label: copyLabel,
@@ -400,7 +499,7 @@
       },
     ];
     const ours = actions.map((a) => makeIconButton(overflowBtn, a));
-    // Insert in order just before … → [copy][open][…][X].
+    // Insert in order just before … → [save][copy][open][…][X].
     ours.forEach((b) => overflowBtn.parentElement.insertBefore(b, overflowBtn));
     // The leftmost of our group is the single right-push point
     // (margin-inline-start:auto); zero the inline-start margins on every button

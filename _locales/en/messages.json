@@ -10,5 +10,13 @@
   "copiedConfirmation": {
     "message": "Copied ✓",
     "description": "Transient tooltip shown on the copy button right after the link is copied."
+  },
+  "savePost": {
+    "message": "Save this post",
+    "description": "Tooltip and accessible label for the injected save button on each feed post."
+  },
+  "savedConfirmation": {
+    "message": "Saved ✓",
+    "description": "Transient tooltip shown on the save button right after the post is saved."
   }
 }
