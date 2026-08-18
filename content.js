@@ -417,6 +417,42 @@
     return null;
   }
 
+  /**
+   * On a post's own permalink page, reflect its current saved state by reading
+   * it once from the … menu: the Save item's icon is bookmark-OUTLINE when not
+   * saved and bookmark-FILL when saved (locale-independent). Opens the menu,
+   * reads the state, sets the button, and dismisses. Called only for the page's
+   * main post, so the feed never opens menus on load.
+   */
+  function primeSavedState(btn, label) {
+    if (btn.getAttribute("data-lnt-primed") === "1") return;
+    btn.setAttribute("data-lnt-primed", "1");
+    const parent = btn.parentElement;
+    const overflowBtn = parent && parent.querySelector(OVERFLOW_SELECTOR);
+    if (!overflowBtn) return;
+    try {
+      overflowBtn.click(); // open the … dropdown (mounts async)
+    } catch (e) {
+      return;
+    }
+    let tries = 0;
+    const tick = () => {
+      const icon = document.querySelector('[role="menu"] svg[id^="bookmark-"]');
+      if (icon) {
+        const saved = /fill/i.test(icon.getAttribute("id") || "");
+        setSavedState(btn, saved, label);
+        dismissMenu();
+        return;
+      }
+      if (++tries < SAVE_MENU_TRIES) {
+        setTimeout(tick, SAVE_MENU_POLL_MS);
+      } else {
+        dismissMenu(); // menu never appeared — leave the button as outline
+      }
+    };
+    setTimeout(tick, SAVE_MENU_POLL_MS);
+  }
+
   /** Close any open dropdown by sending Escape (artdeco menus listen for it). */
   function dismissMenu() {
     try {
@@ -525,6 +561,15 @@
     }
     // Even out the inter-icon spacing to match the native …↔X gap.
     layoutToolbar(ours, overflowBtn);
+
+    // If this is the main post on its own permalink page, read its saved state
+    // once from the … menu so an already-saved post shows a filled bookmark on
+    // load. extractPostUrl(location) is null on the feed, so this never fires
+    // there — only the page whose URN matches this card. ours[0] is Save.
+    const pageUrl = extractPostUrl(location.href);
+    if (pageUrl && pageUrl === url) {
+      primeSavedState(ours[0], saveLabel);
+    }
   }
 
   /** Positive gap between two horizontally-adjacent boxes, regardless of which
