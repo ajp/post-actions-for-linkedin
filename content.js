@@ -380,9 +380,11 @@
     const parent = btn.parentElement;
     const overflowBtn = parent && parent.querySelector(OVERFLOW_SELECTOR);
     if (!overflowBtn) return;
+    suppressMenus(true); // hide the dropdown before it paints
     try {
-      overflowBtn.click(); // open the … dropdown (mounts async)
+      overflowBtn.click(); // open the … dropdown (mounts async, but hidden)
     } catch (e) {
+      suppressMenus(false);
       return;
     }
     let tries = 0;
@@ -394,13 +396,13 @@
         // filled), saved → not-saved (back to outline).
         const nowSaved = btn.getAttribute("data-lnt-saved") !== "1";
         setSavedState(btn, nowSaved, label);
-        dismissMenu(); // belt-and-suspenders in case it didn't auto-close
+        endMenuInteraction(); // dismiss + reveal menus again
         return;
       }
       if (++tries < SAVE_MENU_TRIES) {
         setTimeout(tick, SAVE_MENU_POLL_MS);
       } else {
-        dismissMenu(); // gave up — don't leave the menu hanging open
+        endMenuInteraction(); // gave up — don't leave the menu hanging open
       }
     };
     setTimeout(tick, SAVE_MENU_POLL_MS);
@@ -430,9 +432,11 @@
     const parent = btn.parentElement;
     const overflowBtn = parent && parent.querySelector(OVERFLOW_SELECTOR);
     if (!overflowBtn) return;
+    suppressMenus(true); // hide the dropdown before it paints
     try {
-      overflowBtn.click(); // open the … dropdown (mounts async)
+      overflowBtn.click(); // open the … dropdown (mounts async, but hidden)
     } catch (e) {
+      suppressMenus(false);
       return;
     }
     let tries = 0;
@@ -441,16 +445,29 @@
       if (icon) {
         const saved = /fill/i.test(icon.getAttribute("id") || "");
         setSavedState(btn, saved, label);
-        dismissMenu();
+        endMenuInteraction();
         return;
       }
       if (++tries < SAVE_MENU_TRIES) {
         setTimeout(tick, SAVE_MENU_POLL_MS);
       } else {
-        dismissMenu(); // menu never appeared — leave the button as outline
+        endMenuInteraction(); // menu never appeared — leave the button as outline
       }
     };
     setTimeout(tick, SAVE_MENU_POLL_MS);
+  }
+
+  /** Toggle a root class that hides any open dropdown menu (see styles.css), so
+   *  a menu we drive programmatically never visibly flashes. */
+  function suppressMenus(on) {
+    document.documentElement.classList.toggle("lnt-suppress-menu", !!on);
+  }
+
+  /** Dismiss the menu we opened, then reveal menus again one frame later so the
+   *  menu we drove never flashes on its way open OR closed. */
+  function endMenuInteraction() {
+    dismissMenu();
+    setTimeout(() => suppressMenus(false), 60);
   }
 
   /** Close any open dropdown by sending Escape (artdeco menus listen for it). */
