@@ -166,8 +166,10 @@
 
   const SVG_NS = "http://www.w3.org/2000/svg";
   const COPY_FEEDBACK_MS = 1200; // how long a button flashes its "done" glyph
-  const SAVE_MENU_TRIES = 10; // poll attempts to find the Save item after opening …
+  const SAVE_MENU_TRIES = 10; // poll attempts to find a menu item after opening …
   const SAVE_MENU_POLL_MS = 100; // delay between those attempts
+  const CLIP_READ_TRIES = 8; // poll attempts to read the link LinkedIn just copied
+  const CLIP_READ_POLL_MS = 80; // delay between those attempts
   // Toolbar glyphs. Most are on a 16x16 viewBox to match LinkedIn's own icons;
   // Save reuses LinkedIn's native bookmark glyph, which is authored at 24x24
   // (setGlyph scales it to a 16px box via the per-icon viewBox).
@@ -281,10 +283,10 @@
     return btn;
   }
 
-  /** Open the permalink via the service worker (honors the user's default open
-   *  mode and can background the tab; ⌘/Ctrl inverts the default for one click). */
-  function openInNewTab(url, e) {
-    const toggle = e.metaKey || e.ctrlKey;
+  /** Open a URL via the service worker (honors the user's default open mode and
+   *  can background the tab; toggle inverts the default for one click). */
+  function openTab(url, toggle) {
+    if (!url) return;
     try {
       chrome.runtime.sendMessage({ type: "lnt-open", url, toggle }, () => {
         void chrome.runtime.lastError; // swallow "no receiver" noise
@@ -293,6 +295,107 @@
       // Extension context gone (e.g. just reloaded) — fall back to a normal tab.
       window.open(url, "_blank", "noopener,noreferrer");
     }
+  }
+
+  /** Canonical permalink read from the open … menu's Embed item href, which
+   *  carries the post's real share URN (…targetUrn=urn:li:share:<id>). Correct
+   *  even where our derived URN isn't; null if there's no Embed item. */
+  function menuPostUrl() {
+    const embed = document.querySelector('[role="menu"] a[href*="targetUrn="]');
+    if (!embed) return null;
+    let href = embed.getAttribute("href") || "";
+    try {
+      href = decodeURIComponent(href);
+    } catch (e) {
+      /* keep raw */
+    }
+    const m = href.match(/urn:li:(activity|share|ugcPost):(\d+)/);
+    return m ? location.origin + "/feed/update/urn:li:" + m[1] + ":" + m[2] + "/" : null;
+  }
+
+  /** Best-effort clipboard read → text, or null if unavailable/blocked. */
+  function readClipboardText() {
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        return navigator.clipboard.readText().then((t) => t || "", () => null);
+      }
+    } catch (e) {
+      /* fall through */
+    }
+    return Promise.resolve(null);
+  }
+
+  /** Poll the clipboard until it holds a LinkedIn/lnkd.in URL different from the
+   *  pre-copy snapshot (so we never grab a stale link from an earlier copy).
+   *  Resolves to that URL, or null if it never changed / read is blocked. */
+  function waitForClipboardUrl(prev) {
+    const was = (prev || "").trim();
+    return new Promise((resolve) => {
+      let tries = 0;
+      const attempt = () => {
+        readClipboardText().then((t) => {
+          const s = (t || "").trim();
+          const isUrl = /^https?:\/\/(lnkd\.in|www\.linkedin\.com)\//i.test(s);
+          if (isUrl && s !== was) {
+            resolve(s);
+          } else if (++tries < CLIP_READ_TRIES) {
+            setTimeout(attempt, CLIP_READ_POLL_MS);
+          } else {
+            resolve(null);
+          }
+        });
+      };
+      attempt();
+    });
+  }
+
+  /**
+   * Open the post in a new tab using the same link Copy produces: click
+   * LinkedIn's "Copy link to post" item, read its short link back from the
+   * clipboard, and open that. If the clipboard read is blocked or stale, fall
+   * back to the menu's canonical share permalink, then to our derived URL — so
+   * Open always lands on a working link. `toggle` is captured from the click
+   * before we go async.
+   */
+  function openViaMenu(btn, fallbackUrl, toggle) {
+    const parent = btn.parentElement;
+    const overflowBtn = parent && parent.querySelector(OVERFLOW_SELECTOR);
+    if (!overflowBtn) {
+      openTab(fallbackUrl, toggle);
+      return;
+    }
+    const before = readClipboardText(); // snapshot within the click gesture
+    suppressMenus(true); // hide the dropdown before it paints
+    try {
+      overflowBtn.click(); // open the … dropdown (mounts async, but hidden)
+    } catch (e) {
+      suppressMenus(false);
+      openTab(fallbackUrl, toggle);
+      return;
+    }
+    let tries = 0;
+    const tick = () => {
+      const icon = document.querySelector('[role="menu"] svg[id^="link-"]');
+      const item = icon && icon.closest('[role="menuitem"]');
+      if (item) {
+        const embedUrl = menuPostUrl(); // canonical permalink (while menu is open)
+        item.click(); // LinkedIn copies its short link to the clipboard
+        endMenuInteraction();
+        before.then((prev) =>
+          waitForClipboardUrl(prev).then((short) =>
+            openTab(short || embedUrl || fallbackUrl, toggle)
+          )
+        );
+        return;
+      }
+      if (++tries < SAVE_MENU_TRIES) {
+        setTimeout(tick, SAVE_MENU_POLL_MS);
+      } else {
+        endMenuInteraction();
+        openTab(fallbackUrl, toggle); // menu missing → derived URL
+      }
+    };
+    setTimeout(tick, SAVE_MENU_POLL_MS);
   }
 
   /** Copy the permalink to the clipboard, flashing a checkmark on success. */
@@ -609,7 +712,9 @@
         className: "lnt-open-btn",
         label: openLabel,
         iconD: ICON_PATHS.open,
-        onClick: (e) => openInNewTab(url, e),
+        // Open the same link Copy produces (LinkedIn's short link, read back from
+        // the clipboard); falls back to a canonical permalink. toggle captured now.
+        onClick: (e, btn) => openViaMenu(btn, url, e.metaKey || e.ctrlKey),
       });
     }
     const ours = actions.map((a) => makeIconButton(overflowBtn, a));
