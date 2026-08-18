@@ -5,6 +5,6 @@
    !important beats each route's `svg path { fill: <token> } !important` rule,
    which was otherwise winning the cascade and hiding the icon). So there's
    nothing to style here beyond the cursor. */
-.lnt-open-btn {
+.lnt-action-btn {
   cursor: pointer;
 }

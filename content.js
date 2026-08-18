@@ -28,7 +28,7 @@
   const URL_RETRY_GIVEUP_MS = 4000; // stop re-walking a card that never gets a permalink
   const STALE_SELECTOR_WARN_MS = 5000; // delay before the one-time "selector stale" warning
   const MAX_WALK_DEPTH = 12; // ancestor-walk cap when hunting a card's permalink
-  const GAP_MEASURE_RETRIES = 5; // equalizeGap re-measures this many times if layout isn't ready
+  const GAP_MEASURE_RETRIES = 5; // layoutToolbar re-measures this many times if layout isn't ready
   const GAP_MEASURE_RETRY_MS = 200;
   // Identify a post's … (overflow) button. Primary signal is the localized
   // aria-label; we ALSO match the overflow icon's stable svg id so non-English
@@ -165,9 +165,13 @@
   }
 
   const SVG_NS = "http://www.w3.org/2000/svg";
-  // "Open in new tab" glyph path (16x16 viewBox, same as LinkedIn's icons).
-  const ICON_PATH_D =
-    "M9 1v2h2.59L6.3 8.29l1.41 1.41L13 4.41V7h2V1zM11 13H3V5h4V3H3a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9h-2z";
+  const COPY_FEEDBACK_MS = 1200; // how long the copy button flashes "Copied ✓"
+  // Toolbar glyph paths, all on a 16x16 viewBox to match LinkedIn's own icons.
+  const ICON_PATHS = {
+    open: "M9 1v2h2.59L6.3 8.29l1.41 1.41L13 4.41V7h2V1zM11 13H3V5h4V3H3a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9h-2z",
+    copy: "M5.5 3.5A1.5 1.5 0 0 1 7 2h5a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 12 12h-.5v-1H12a.5.5 0 0 0 .5-.5v-7A.5.5 0 0 0 12 3H7a.5.5 0 0 0-.5.5V4h-1v-.5zM3.5 5A1.5 1.5 0 0 0 2 6.5v7A1.5 1.5 0 0 0 3.5 15h5A1.5 1.5 0 0 0 10 13.5v-7A1.5 1.5 0 0 0 8.5 5h-5zM3 6.5A.5.5 0 0 1 3.5 6h5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-.5.5h-5a.5.5 0 0 1-.5-.5v-7z",
+    check: "M13.5 4.5l-7 7L3 8l1-1 2.5 2.5L12.5 3.5z",
+  };
   // Native LinkedIn icons paint with fill="currentColor", so currentColor is the
   // theme-correct color and it FOLLOWS LinkedIn's in-app dark/light toggle (which
   // doesn't reload the page). Set inline with !important so it still beats each
@@ -176,48 +180,21 @@
   // near-black before the native svg had painted.
   const ICON_FILL = "currentColor";
 
+  /** i18n helper: localized message when a translation exists, else the fallback. */
+  function msg(key, fallback) {
+    return (chrome.i18n && chrome.i18n.getMessage(key)) || fallback;
+  }
+
   /**
-   * Build our button by cloning the post's own … (overflow) button, then
-   * swapping in our glyph. Cloning means we inherit LinkedIn's exact size,
-   * vertical alignment, spacing and hover treatment for whatever layout/build
-   * is live — instead of chasing per-layout CSS against randomized class names.
+   * Swap a cloned button's glyph for our own. Builds a FRESH namespaced <svg>
+   * rather than reusing the cloned svg. Color/size are set INLINE with
+   * !important: the cloned button keeps LinkedIn's classes, and each route's
+   * stylesheet has its own `svg path { fill: <token> } !important` rule that
+   * would otherwise win the cascade and leave the icon invisible. An inline
+   * !important beats any stylesheet !important regardless of specificity/order.
+   * Returns the <path> so callers can flip the glyph later (copy feedback).
    */
-  function makeButton(overflowBtn, url) {
-    const btn = overflowBtn.cloneNode(true);
-    btn.classList.add("lnt-open-btn");
-    btn.setAttribute("type", "button");
-    // Localized via _locales when a translation exists; falls back to English if
-    // chrome.i18n is unavailable or the message is missing for the UI locale.
-    const label =
-      (chrome.i18n && chrome.i18n.getMessage("openPostInNewTab")) ||
-      "Open this post in a new tab";
-    btn.setAttribute("title", label);
-    btn.setAttribute("aria-label", label);
-    btn.removeAttribute("aria-haspopup");
-    btn.removeAttribute("aria-expanded");
-    btn.removeAttribute("componentkey");
-    btn.removeAttribute(PROCESSED_ATTR);
-    // The clone copies id / aria-ref attributes; strip them (on the button and
-    // any descendants) so the injected node can't duplicate an id or hijack
-    // LinkedIn's id-based lookups.
-    ["id", "name", "aria-controls", "aria-describedby", "aria-labelledby"].forEach(
-      (a) => btn.removeAttribute(a)
-    );
-    btn.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
-
-    // LinkedIn lazy-loads icons: a blank <span data-dynamic-icon-loading>
-    // placeholder sits beside the svg until the real icon loads, then LinkedIn's
-    // JS removes it. Our clone can freeze that placeholder in place (LinkedIn no
-    // longer manages it); left in, it occupies an icon-sized slot in the
-    // centering flex wrapper and shoves our glyph off-center. Drop it.
-    btn.querySelectorAll("[data-dynamic-icon-loading]").forEach((el) => el.remove());
-
-    // Swap the … dots for our glyph. Build a FRESH namespaced <svg> rather than
-    // reusing the cloned svg. Color/size are set INLINE with !important: the
-    // cloned button keeps LinkedIn's classes, and each route's stylesheet has
-    // its own `svg path { fill: <token> } !important` rule that would otherwise
-    // win the cascade and leave the icon invisible. An inline !important beats
-    // any stylesheet !important regardless of specificity or load order.
+  function setGlyph(btn, d) {
     const oldSvg = btn.querySelector("svg");
     const svg = document.createElementNS(SVG_NS, "svg");
     svg.setAttribute("xmlns", SVG_NS);
@@ -242,7 +219,7 @@
     svg.style.setProperty("visibility", "visible", "important");
     svg.style.setProperty("opacity", "1", "important");
     const path = document.createElementNS(SVG_NS, "path");
-    path.setAttribute("d", ICON_PATH_D);
+    path.setAttribute("d", d);
     path.style.setProperty("fill", ICON_FILL, "important");
     svg.appendChild(path);
     if (oldSvg) {
@@ -250,32 +227,106 @@
     } else {
       (btn.querySelector("span") || btn).appendChild(svg);
     }
+    return path;
+  }
 
-    // Our button leads the …/X trio and must sit flush against them at the
-    // inline-end edge, consistently across both header layouts. Make OUR button
-    // the single push point (margin-inline-start:auto); processOverflowButton
-    // then zeroes the inline-start margins on the buttons after us so no
-    // competing auto margin opens a gap between the icons. Logical (inline-*)
-    // margins only — physical margin-left would fight this under RTL locales.
-    btn.style.setProperty("margin-inline-start", "auto", "important");
+  /**
+   * Build one toolbar button by cloning the post's own … (overflow) button and
+   * swapping in our glyph. Cloning inherits LinkedIn's exact size, alignment,
+   * spacing and hover treatment for whatever layout/build is live — instead of
+   * chasing per-layout CSS against randomized class names. Inter-button spacing
+   * is set later by layoutToolbar(); this only builds the node.
+   */
+  function makeIconButton(overflowBtn, { className, label, iconD, onClick }) {
+    const btn = overflowBtn.cloneNode(true);
+    btn.classList.add("lnt-action-btn", className);
+    btn.setAttribute("type", "button");
+    btn.setAttribute("title", label);
+    btn.setAttribute("aria-label", label);
+    btn.removeAttribute("aria-haspopup");
+    btn.removeAttribute("aria-expanded");
+    btn.removeAttribute("componentkey");
+    btn.removeAttribute(PROCESSED_ATTR);
+    // The clone copies id / aria-ref attributes; strip them (on the button and
+    // any descendants) so the injected node can't duplicate an id or hijack
+    // LinkedIn's id-based lookups.
+    ["id", "name", "aria-controls", "aria-describedby", "aria-labelledby"].forEach(
+      (a) => btn.removeAttribute(a)
+    );
+    btn.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+
+    // LinkedIn lazy-loads icons: a blank <span data-dynamic-icon-loading>
+    // placeholder sits beside the svg until the real icon loads, then LinkedIn's
+    // JS removes it. Our clone can freeze that placeholder in place (LinkedIn no
+    // longer manages it); left in, it occupies an icon-sized slot in the
+    // centering flex wrapper and shoves our glyph off-center. Drop it.
+    btn.querySelectorAll("[data-dynamic-icon-loading]").forEach((el) => el.remove());
+
+    setGlyph(btn, iconD);
 
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      // Open via the service worker, which honors the user's default (set in the
-      // options page) and can place the tab in the background — window.open from
-      // a content script can't. ⌘/Ctrl-click inverts the default for one click.
-      const toggle = e.metaKey || e.ctrlKey;
-      try {
-        chrome.runtime.sendMessage({ type: "lnt-open", url, toggle }, () => {
-          void chrome.runtime.lastError; // swallow "no receiver" noise
-        });
-      } catch (err) {
-        // Extension context gone (e.g. just reloaded) — fall back to a normal tab.
-        window.open(url, "_blank", "noopener,noreferrer");
-      }
+      onClick(e, btn);
     });
     return btn;
+  }
+
+  /** Open the permalink via the service worker (honors the user's default open
+   *  mode and can background the tab; ⌘/Ctrl inverts the default for one click). */
+  function openInNewTab(url, e) {
+    const toggle = e.metaKey || e.ctrlKey;
+    try {
+      chrome.runtime.sendMessage({ type: "lnt-open", url, toggle }, () => {
+        void chrome.runtime.lastError; // swallow "no receiver" noise
+      });
+    } catch (err) {
+      // Extension context gone (e.g. just reloaded) — fall back to a normal tab.
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  }
+
+  /** Copy the permalink to the clipboard, flashing a checkmark on success. */
+  function copyLink(url, btn, label) {
+    const ok = () => flashCopied(btn, label);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(ok, () => fallbackCopy(url, ok));
+      } else {
+        fallbackCopy(url, ok);
+      }
+    } catch (e) {
+      fallbackCopy(url, ok);
+    }
+  }
+
+  /** Clipboard fallback for non-secure contexts / older engines. */
+  function fallbackCopy(text, done) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+      if (done) done();
+    } catch (e) {
+      /* clipboard unavailable — nothing more we can do */
+    }
+  }
+
+  /** Briefly show a checkmark + "Copied" on the copy button, then restore it. */
+  function flashCopied(btn, label) {
+    const path = btn.querySelector("svg path");
+    if (path) path.setAttribute("d", ICON_PATHS.check);
+    btn.setAttribute("title", msg("copiedConfirmation", "Copied ✓"));
+    clearTimeout(btn._lntFlash);
+    btn._lntFlash = setTimeout(() => {
+      if (path) path.setAttribute("d", ICON_PATHS.copy);
+      btn.setAttribute("title", label);
+    }, COPY_FEEDBACK_MS);
   }
 
   function processOverflowButton(overflowBtn) {
@@ -283,9 +334,11 @@
     if (overflowBtn.getAttribute(PROCESSED_ATTR) === "1") return;
     // Dedupe on the presence of OUR clone, not just the flag: React can replace
     // the native … button with a fresh (unflagged) node on re-render while our
-    // clone persists as a sibling. Without this, that would inject a duplicate.
+    // toolbar persists as siblings. The button immediately before … is the last
+    // of our group, so match our shared marker class. Without this, a re-render
+    // would inject a duplicate toolbar.
     const prev = overflowBtn.previousElementSibling;
-    if (prev && prev.classList && prev.classList.contains("lnt-open-btn")) {
+    if (prev && prev.classList && prev.classList.contains("lnt-action-btn")) {
       overflowBtn.setAttribute(PROCESSED_ATTR, "1");
       return;
     }
@@ -327,20 +380,43 @@
     }
 
     overflowBtn.setAttribute(PROCESSED_ATTR, "1");
-    const btn = makeButton(overflowBtn, url);
-    // Place our button just before … so the order is [ours][…][X] (our icon
-    // third from the right). Zero the inline-start margins on the buttons to our
-    // right so OUR auto margin is the only push point (keeps the trio flush at
-    // the right edge in both header layouts).
-    overflowBtn.parentElement.insertBefore(btn, overflowBtn);
+
+    // Our quick-action toolbar, listed left→right. Each is a clone of … with our
+    // glyph and handler. Add more actions here (e.g. Save) and they slot in.
+    const openLabel = msg("openPostInNewTab", "Open this post in a new tab");
+    const copyLabel = msg("copyLinkToPost", "Copy link to this post");
+    const actions = [
+      {
+        className: "lnt-copy-btn",
+        label: copyLabel,
+        iconD: ICON_PATHS.copy,
+        onClick: (e, btn) => copyLink(url, btn, copyLabel),
+      },
+      {
+        className: "lnt-open-btn",
+        label: openLabel,
+        iconD: ICON_PATHS.open,
+        onClick: (e) => openInNewTab(url, e),
+      },
+    ];
+    const ours = actions.map((a) => makeIconButton(overflowBtn, a));
+    // Insert in order just before … → [copy][open][…][X].
+    ours.forEach((b) => overflowBtn.parentElement.insertBefore(b, overflowBtn));
+    // The leftmost of our group is the single right-push point
+    // (margin-inline-start:auto); zero the inline-start margins on every button
+    // after it (our others, …, X) so no competing margin opens a gap. Keeps the
+    // whole row flush at the inline-end edge under both header layouts and RTL.
+    ours[0].style.setProperty("margin-inline-start", "auto", "important");
+    for (let i = 1; i < ours.length; i++) {
+      ours[i].style.setProperty("margin-inline-start", "0", "important");
+    }
     for (let sib = overflowBtn; sib; sib = sib.nextElementSibling) {
       if (sib.tagName === "BUTTON") {
         sib.style.setProperty("margin-inline-start", "0", "important");
       }
     }
-    // Make the ours↔… gap equal the native …↔X gap. LinkedIn's exact spacing
-    // mechanism varies by layout, so measure it live and set our end margin.
-    equalizeGap(btn, overflowBtn);
+    // Even out the inter-icon spacing to match the native …↔X gap.
+    layoutToolbar(ours, overflowBtn);
   }
 
   /** Positive gap between two horizontally-adjacent boxes, regardless of which
@@ -349,36 +425,44 @@
     return Math.max(a.left, b.left) - Math.min(a.right, b.right);
   }
 
-  /** Set our button's inline-end margin so ours↔… spacing matches the native
-   *  …↔X gap. Uses direction-agnostic gaps and the logical inline-end margin so
-   *  it's correct in RTL too. Re-measures a bounded number of times if the card
-   *  isn't laid out yet (e.g. injected while collapsed) rather than giving up. */
-  function equalizeGap(iconBtn, dotsBtn, attempt = 0) {
-    const next = dotsBtn.nextElementSibling;
-    if (!next || next.tagName !== "BUTTON") return; // no X to match against
+  /** Set each of our buttons' inline-end margin so every gap in the row —
+   *  ours↔ours and (last)ours↔… — matches the native …↔X gap. Uses
+   *  direction-agnostic gaps and the logical inline-end margin so it's correct
+   *  in RTL too. Re-measures a bounded number of times if the card isn't laid
+   *  out yet (e.g. injected while collapsed) rather than giving up. */
+  function layoutToolbar(ours, dotsBtn, attempt = 0) {
+    const x = dotsBtn.nextElementSibling; // the native X (hide) button
+    if (!x || x.tagName !== "BUTTON") return; // nothing to match the gap against
     requestAnimationFrame(() => {
       try {
-        if (!iconBtn.isConnected) return; // removed by a re-render — nothing to do
+        if (!ours[0] || !ours[0].isConnected) return; // removed by a re-render
+        const rects = ours.map((b) => b.getBoundingClientRect());
         const dots = dotsBtn.getBoundingClientRect();
-        const nextRect = next.getBoundingClientRect();
-        const iconRect = iconBtn.getBoundingClientRect();
+        const xr = x.getBoundingClientRect();
         // Not laid out yet (hidden tab / display:none card) → rects are zero.
-        // Retry a bounded number of times so the gap is measured once real
+        // Retry a bounded number of times so the gaps are measured once real
         // layout exists, instead of staying unequalized for the card's life.
-        if (!dots.width || !nextRect.width || !iconRect.width) {
+        if (!dots.width || !xr.width || rects.some((r) => !r.width)) {
           if (attempt < GAP_MEASURE_RETRIES) {
             setTimeout(
-              () => equalizeGap(iconBtn, dotsBtn, attempt + 1),
+              () => layoutToolbar(ours, dotsBtn, attempt + 1),
               GAP_MEASURE_RETRY_MS
             );
           }
           return;
         }
-        const targetGap = gapBetween(dots, nextRect); // native …↔X
-        const currentGap = gapBetween(iconRect, dots); // ours↔…
-        const cur = parseFloat(getComputedStyle(iconBtn).marginInlineEnd) || 0;
-        const end = Math.max(0, cur + (targetGap - currentGap));
-        iconBtn.style.setProperty("margin-inline-end", end + "px", "important");
+        const nativeGap = gapBetween(dots, xr); // …↔X, the gap to reproduce
+        // Walk each of our buttons and match its gap to the next element (our
+        // next button, or … for the last one). The leftmost's auto margin keeps
+        // the whole group flush-right, so these inline-end tweaks only set the
+        // internal spacing.
+        const seq = rects.concat([dots]);
+        for (let i = 0; i < ours.length; i++) {
+          const cur = parseFloat(getComputedStyle(ours[i]).marginInlineEnd) || 0;
+          const gap = gapBetween(seq[i], seq[i + 1]);
+          const end = Math.max(0, cur + (nativeGap - gap));
+          ours[i].style.setProperty("margin-inline-end", end + "px", "important");
+        }
       } catch (e) {
         /* leave as-is */
       }
@@ -411,7 +495,7 @@
     if (
       /\/(feed|in)\//.test(location.pathname) &&
       document.querySelector(OVERFLOW_SELECTOR) &&
-      !document.querySelector(".lnt-open-btn")
+      !document.querySelector(".lnt-action-btn")
     ) {
       console.warn(
         "[lnt] LinkedIn Open-in-New-Tab: found overflow menus but injected no " +
