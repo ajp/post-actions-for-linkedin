@@ -5,6 +5,18 @@
    !important beats each route's `svg path { fill: <token> } !important` rule,
    which was otherwise winning the cascade and hiding the icon). So there's
    nothing to style here beyond the cursor. */
-.lnt-open-btn {
+.lnt-action-btn {
   cursor: pointer;
+}
+
+/* While we drive the … menu programmatically (to read or toggle a post's
+   saved state), hide the dropdown so it never visibly flashes. element.click()
+   and the menu's handlers still fire on a visibility:hidden node, so the Save
+   action and state read work unchanged. Scoped to a root class we toggle only
+   for the brief window of that interaction. */
+html.lnt-suppress-menu [role="menu"],
+html.lnt-suppress-menu .artdeco-dropdown__content {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }

@@ -17,41 +17,51 @@ Promotional images and listing copy for submitting this extension to the
 
 At least one 1280×800 (or 640×400) screenshot is required; up to 5 are allowed.
 
+> **Note:** the committed promo images still show the single open-in-new-tab
+> button from 1.1.x. Regenerate them to show the Save / Copy / Open toolbar
+> before submitting 1.2.
+
 ## Listing copy
 
 **Name:** Open Post in New Tab for LinkedIn
 
+> Consider renaming to reflect the toolbar (e.g. "Post Quick Actions for
+> LinkedIn") — the current name now undersells Save and Copy.
+
 **Summary** (≤132 chars):
-> Adds an open-in-new-tab button to every LinkedIn feed post — one click opens the post's permalink in a new tab. No tracking.
+> A quick-action toolbar on every LinkedIn post: Save, Copy link, and Open in a new tab — one click each. No tracking.
 
 **Category:** Productivity
 
 **Description:**
-> Tired of LinkedIn opening posts in a modal, or digging into the “…” menu just
-> to copy a link? This extension adds a small open-in-new-tab icon right next to
-> the “…” menu on every feed post. One click opens that post on its own page.
+> LinkedIn tucks a post's most useful actions inside the “…” menu. This extension
+> surfaces them as one-click icons right in the post header, so you can act
+> without opening the menu.
 >
-> • One click — no menu, no “Copy link”.
-> • Opens in a background tab by default so you keep scrolling (configurable;
->   hold ⌘/Ctrl to flip it for one click).
-> • Looks native — the button is cloned from LinkedIn’s own controls and matches
->   light/dark themes.
-> • Works across the feed (Top and Recent sorts), profiles, activity pages,
->   reposts, and “Suggested” posts.
+> • Save — saves the post to your real LinkedIn Saved items (the bookmark fills;
+>   click again to unsave).
+> • Copy link — copies the post's canonical LinkedIn link.
+> • Open in a new tab — opens the post on its own page; background tab by default
+>   (hold ⌘/Ctrl to flip it for one click).
+> • Looks native — each icon is cloned from LinkedIn’s own controls and matches
+>   light/dark themes; no menu ever visibly pops up.
+> • Works across the feed (both sorts), profiles, activity pages, reposts, and
+>   “Suggested” posts, in any UI language.
 >
-> Private by design: no tracking, no data collection, no network calls. Site
-> access is limited to linkedin.com, and the only permission is “storage”, used
-> solely to remember your background/foreground preference.
+> Private by design: no tracking, no data collection, and the extension makes no
+> network requests of its own. Site access is limited to linkedin.com, and the
+> only permission is “storage”, used solely to remember your Open tab preference.
+> Save and Copy work by activating LinkedIn’s own menu items on your click.
 >
 > Not affiliated with, endorsed by, or sponsored by LinkedIn Corporation.
 
 ## Privacy / review form answers
 
-- **Single purpose:** Adds a button to LinkedIn feed posts that opens the post in a new tab.
+- **Single purpose:** Adds a quick-action toolbar to LinkedIn feed posts that surfaces the post's own Save, Copy link, and Open-in-a-new-tab actions as one-click icons.
 - **`storage` permission:** Stores the user's preference for opening posts in a background vs. foreground tab.
-- **Host access (`https://www.linkedin.com/*`):** The content script runs only on LinkedIn to read the post's URL already present in the page and inject the button. No other sites.
+- **Host access (`https://www.linkedin.com/*`):** The content script runs only on LinkedIn to add the toolbar, read the post's link from the page, and — on the user's click — activate LinkedIn's own Save/Copy menu items or open the post in a new tab. No other sites.
 - **Remote code:** No.
-- **Data collection:** None. The extension does not collect or transmit any user data.
+- **Data collection:** None. The extension does not collect or transmit any user data. (Save/Copy invoke LinkedIn's own controls; the clipboard is written/read locally only.)
 
 ## Regenerating
 

@@ -8,8 +8,11 @@
  */
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (!msg || msg.type !== "lnt-open" || typeof msg.url !== "string") return;
-  // Only ever open LinkedIn post permalinks.
-  if (!/^https:\/\/www\.linkedin\.com\/feed\/update\//.test(msg.url)) return;
+  // Only ever open LinkedIn links: canonical post permalinks (…/feed/update/…,
+  // …/posts/…) and LinkedIn's own lnkd.in short links (what "Copy link to post"
+  // produces). Restricting to these hosts keeps a page-supplied URL from
+  // pointing the new tab anywhere off-LinkedIn.
+  if (!/^https:\/\/(www\.linkedin\.com\/(feed\/update\/|posts\/)|lnkd\.in\/)/.test(msg.url)) return;
   const tab = sender.tab;
   const open = (openMode) => {
     let active = openMode === "foreground";

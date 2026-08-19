@@ -2,5 +2,21 @@
   "openPostInNewTab": {
     "message": "Open this post in a new tab",
     "description": "Tooltip and accessible label for the injected open-in-new-tab button on each feed post."
+  },
+  "copyLinkToPost": {
+    "message": "Copy link to this post",
+    "description": "Tooltip and accessible label for the injected copy-link button on each feed post."
+  },
+  "copiedConfirmation": {
+    "message": "Copied ✓",
+    "description": "Transient tooltip shown on the copy button right after the link is copied."
+  },
+  "savePost": {
+    "message": "Save this post",
+    "description": "Tooltip and accessible label for the injected save button on each feed post."
+  },
+  "savedState": {
+    "message": "Saved — click to remove",
+    "description": "Tooltip shown on the save button while the post is saved (filled bookmark)."
   }
 }
