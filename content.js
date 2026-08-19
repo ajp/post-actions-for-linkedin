@@ -69,6 +69,12 @@
     return null;
   }
 
+  /** The numeric post id from a canonical permalink (type-agnostic), or null. */
+  function postIdOf(u) {
+    const m = (u || "").match(/urn:li:(?:activity|share|ugcPost):(\d+)/);
+    return m ? m[1] : null;
+  }
+
   /**
    * True if this overflow button belongs to a COMMENT, not the post itself.
    * Comment menus use the same overflow icon, so we exclude them: walking up,
@@ -700,9 +706,17 @@
     const openLabel = msg("openPostInNewTab", "Open this post in a new tab");
     const copyLabel = msg("copyLinkToPost", "Copy link to this post");
     const saveLabel = msg("savePost", "Save this post");
-    // On the post's own permalink page we're already here, so Open is redundant.
-    const pageUrl = extractPostUrl(location.href);
-    const onOwnPage = pageUrl !== null && pageUrl === url;
+    // On the post's own canonical page (/feed/update/… or /posts/…) we're already
+    // here, so Open is redundant. Match by post id — and because a card can derive
+    // a different URN *type* than the page URL (activity vs share resolve to the
+    // same post), also treat it as our own page when the page's id appears in this
+    // card. Other posts on a detail page (recommendations) won't contain it.
+    const pageId = postIdOf(extractPostUrl(location.href));
+    const ownCard = overflowBtn.closest('[role="listitem"]');
+    const onOwnPage =
+      pageId !== null &&
+      (postIdOf(url) === pageId ||
+        (ownCard && ownCard.innerHTML.indexOf(pageId) !== -1));
     const actions = [
       {
         className: "lnt-save-btn",
