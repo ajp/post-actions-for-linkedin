@@ -63,9 +63,9 @@
     // A urn anywhere in the (decoded) URL — path or query param. Keep its type.
     let m = s.match(/urn:li:(activity|share|ugcPost):(\d+)/);
     if (m) return location.origin + "/feed/update/urn:li:" + m[1] + ":" + m[2] + "/";
-    // /posts/<slug>-activity-<id>-<code> style permalinks.
-    m = s.match(/-activity-(\d+)/);
-    if (m) return location.origin + "/feed/update/urn:li:activity:" + m[1] + "/";
+    // /posts/<slug>-<type>-<id>-<code> style permalinks (activity/share/ugcPost).
+    m = s.match(/-(activity|share|ugcPost)-(\d+)/);
+    if (m) return location.origin + "/feed/update/urn:li:" + m[1] + ":" + m[2] + "/";
     return null;
   }
 
