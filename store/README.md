@@ -61,7 +61,7 @@ At least one 1280×800 (or 640×400) screenshot is required; up to 5 are allowed
 - **`storage` permission:** Stores the user's preference for opening posts in a background vs. foreground tab.
 - **Host access (`https://www.linkedin.com/*`):** The content script runs only on LinkedIn to add the toolbar, read the post's link from the page, and — on the user's click — activate LinkedIn's own Save/Copy menu items or open the post in a new tab. No other sites.
 - **Remote code:** No.
-- **Data collection:** None. The extension does not collect or transmit any user data. (Save/Copy invoke LinkedIn's own controls; the clipboard is written/read locally only.)
+- **Data collection:** None. The extension does not collect or transmit any user data. (Save/Copy invoke LinkedIn's own controls; the clipboard is written locally only — no clipboard read.)
 
 ## Regenerating
 

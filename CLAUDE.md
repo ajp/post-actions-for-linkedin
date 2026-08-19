@@ -78,9 +78,9 @@ post's permalink streams in). The whole design works around this:
   with `!important`** to beat each route's `svg path { fill: … } !important` rule;
   fill is `currentColor` so it follows LinkedIn's in-app (not OS) dark/light toggle
   live. See the `clone-overflow-button-approach` memory for the full rationale.
-- **Actions**: Open uses the derived permalink (and reads LinkedIn's clipboard link
-  to match Copy's exact link, falling back to the permalink / the menu's Embed share
-  URN). **Save (`saveViaMenu`) and Copy (`copyViaMenu`)** drive LinkedIn's own `…`
+- **Actions**: Open (`openViaMenu`) reads the post's share URN from the menu's Embed
+  href (opening the hidden menu), falling back to the derived permalink — no clipboard
+  access. **Save (`saveViaMenu`) and Copy (`copyViaMenu`)** drive LinkedIn's own `…`
   menu: open it, click the item matched by its stable icon (`bookmark-*` for
   Save/Unsave, `link-*` for Copy link), dismiss. `primeSavedState` reads the saved
   state on a post's own page. The live `…` is re-resolved at click time (React can

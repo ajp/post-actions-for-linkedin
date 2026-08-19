@@ -96,12 +96,12 @@ virtualized feed streams posts in.
 
 Each action gets its link/state differently:
 
-- **Open** derives the post's canonical permalink straight from the card
-  (`…/feed/update/urn:li:<type>:<id>/`, decoding the URL-encoded URN the main
-  feed uses), so it's instant. To match Copy's exact link it also reads the link
-  LinkedIn writes to the clipboard; where that read is unavailable it falls back
-  to the permalink, and for cards with no card-level link at all (e.g.
-  social-proof) it reads the post's share URN from the menu's Embed reference.
+- **Open** reads the post's canonical share URN from the `…` menu's **Embed**
+  reference (`…targetUrn=urn:li:share:<id>`), which is correct even on cards where
+  the card-derived URN isn't (e.g. social-proof). It opens the hidden menu only to
+  read that href — **no clipboard access** — and falls back to the card-derived
+  permalink (`…/feed/update/urn:li:<type>:<id>/`, decoding the URL-encoded URN the
+  main feed uses) if there's no Embed item.
 - **Copy** and **Save** drive LinkedIn's own `…` menu items — matched by their
   stable icons (`link-*` for Copy link, `bookmark-*` for Save/Unsave) rather than
   localized text. The menu is opened programmatically but kept hidden (a
@@ -126,10 +126,9 @@ its own** and collects or transmits **no data**. Its single permission is
 The Save and Copy actions work by activating LinkedIn's **own** `…` menu items on
 your click: **Save** adds the post to your LinkedIn Saved items (an action on your
 account, performed by LinkedIn), and **Copy link** puts the link on your
-clipboard (via LinkedIn's copy control). To make **Open** land on the same link,
-the extension makes a best-effort read of that clipboard link; if the browser
-doesn't allow the read, Open uses the post's permalink instead. Nothing is sent
-anywhere by the extension.
+clipboard (via LinkedIn's copy control). **Open** reads the post's link from the
+`…` menu's Embed reference — no clipboard access. Nothing is sent anywhere by the
+extension.
 
 ## Project layout
 
