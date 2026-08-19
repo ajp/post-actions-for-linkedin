@@ -604,10 +604,61 @@
     setTimeout(tick, SAVE_MENU_POLL_MS);
   }
 
-  /** Toggle a root class that hides any open dropdown menu (see styles.css), so
-   *  a menu we drive programmatically never visibly flashes. */
+  // Signals that a node is (part of) the … dropdown: the menu itself, or the
+  // loading spinner LinkedIn shows first while the items stream in.
+  const POPOVER_HINT = '[role="menu"], [role="progressbar"], .artdeco-loader';
+  let menuHideObserver = null;
+
+  /** Hide the popover that contains `node` from its first frame: walk up to the
+   *  nearest positioned ancestor (the dropdown surface) and hide that, so even
+   *  the pre-menu spinner phase never paints. Marked so we can restore it. */
+  function hidePopover(node) {
+    let el = node;
+    for (let i = 0; el && el !== document.body && i < 8; i++) {
+      const pos = getComputedStyle(el).position;
+      if (pos === "fixed" || pos === "absolute") break;
+      el = el.parentElement;
+    }
+    const target = el && el !== document.body ? el : node;
+    if (target.getAttribute("data-lnt-hidden") === "1") return;
+    target.setAttribute("data-lnt-hidden", "1");
+    target.style.setProperty("visibility", "hidden", "important");
+    target.style.setProperty("opacity", "0", "important");
+    target.style.setProperty("pointer-events", "none", "important");
+  }
+
+  /**
+   * Hide any dropdown we drive programmatically so it never visibly flashes.
+   * The class (styles.css) covers [role="menu"], but LinkedIn paints a spinner
+   * container BEFORE role="menu" exists, so we also watch for the dropdown being
+   * inserted and hide its container in the observer microtask (before paint).
+   */
   function suppressMenus(on) {
     document.documentElement.classList.toggle("lnt-suppress-menu", !!on);
+    if (on) {
+      if (!menuHideObserver) {
+        menuHideObserver = new MutationObserver((records) => {
+          for (const r of records) {
+            for (const node of r.addedNodes) {
+              if (node.nodeType !== Node.ELEMENT_NODE) continue;
+              const hit = node.matches?.(POPOVER_HINT)
+                ? node
+                : node.querySelector?.(POPOVER_HINT);
+              if (hit) hidePopover(hit);
+            }
+          }
+        });
+      }
+      menuHideObserver.observe(document.body, { childList: true, subtree: true });
+    } else if (menuHideObserver) {
+      menuHideObserver.disconnect();
+      document.querySelectorAll('[data-lnt-hidden="1"]').forEach((el) => {
+        el.style.removeProperty("visibility");
+        el.style.removeProperty("opacity");
+        el.style.removeProperty("pointer-events");
+        el.removeAttribute("data-lnt-hidden");
+      });
+    }
   }
 
   /** Dismiss the menu we opened, then reveal menus again only once the one we
