@@ -195,9 +195,25 @@
   // near-black before the native svg had painted.
   const ICON_FILL = "currentColor";
 
+  /** True while our extension context is still valid. After the extension is
+   *  reloaded/updated, content scripts already injected in open tabs are
+   *  orphaned and any `chrome.*` call throws "Extension context invalidated";
+   *  `chrome.runtime.id` goes undefined, so we can detect it and stop cleanly. */
+  function extAlive() {
+    try {
+      return !!(chrome.runtime && chrome.runtime.id);
+    } catch (e) {
+      return false;
+    }
+  }
+
   /** i18n helper: localized message when a translation exists, else the fallback. */
   function msg(key, fallback) {
-    return (chrome.i18n && chrome.i18n.getMessage(key)) || fallback;
+    try {
+      return (chrome.i18n && chrome.i18n.getMessage(key)) || fallback;
+    } catch (e) {
+      return fallback; // orphaned context — degrade to English
+    }
   }
 
   /**
@@ -864,6 +880,12 @@
   // like messaging/jobs) would trigger a full-document rescan on every frame.
   const RELEVANT = OVERFLOW_SELECTOR + ", " + POST_HREF;
   const observer = new MutationObserver((records) => {
+    // Orphaned after an extension reload: stop observing so we don't keep
+    // re-scanning (and throwing "context invalidated") on every feed mutation.
+    if (!extAlive()) {
+      observer.disconnect();
+      return;
+    }
     for (const r of records) {
       for (const node of r.addedNodes) {
         if (node.nodeType !== Node.ELEMENT_NODE) continue;
