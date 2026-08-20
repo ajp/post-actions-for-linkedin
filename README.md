@@ -11,27 +11,30 @@ right next to the post's `…` menu. One click each, no digging through the menu
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-informational">
 </p>
 
-> **Note:** the screenshots below predate the toolbar (they show the single
-> open-in-new-tab button from 1.1.x) and will be refreshed for the 1.2 release.
-
 ## Screenshots
 
-The injected controls are cloned from the post's own `…` button, so they match
-LinkedIn's size, spacing, hover circle, and theme color in both light and dark:
+The toolbar on a feed post (dark mode) — **Save**, **Copy link**, and **Open in a
+new tab**, cloned from the post's own controls:
 
-![A LinkedIn post shown in light and dark mode with the injected control next to the … menu](docs/screenshot-feed.png)
+![The Post Actions toolbar next to a post's … menu in dark mode](docs/screenshot-feed.png)
 
-![The injected control hovered, showing LinkedIn's native focus ring in light and dark](docs/screenshot-hover.png)
+Hover shows LinkedIn's native tooltip and hover circle:
 
-Choose whether posts open in a background or foreground tab — and note the
-permissions: site access is limited to `linkedin.com`, with only the `storage`
-permission (for your preference).
+![The Save button hovered, showing LinkedIn's "Save this post" tooltip](docs/screenshot-hover.png)
 
-<p>
-  <img src="docs/screenshot-options.png" alt="Settings popup to choose background vs foreground tab" height="360">
-  &nbsp;&nbsp;
-  <img src="docs/screenshot-permissions.png" alt="Extension details page showing site access limited to https://www.linkedin.com/*" height="360">
-</p>
+Saved — the bookmark fills and stays filled (click again to unsave):
+
+![The toolbar with the bookmark filled, indicating the post is saved](docs/screenshot-saved.png)
+
+Save and Copy run LinkedIn's **own** save/copy harnesses, so you get its real
+behavior — here, Copy fires LinkedIn's copy action and its "Link copied"
+confirmation:
+
+![A post showing the copy checkmark and LinkedIn's "Link copied to clipboard" toast](docs/screenshot-copy.png)
+
+Works on every kind of post, including "Suggested" cards:
+
+![The toolbar on a Suggested post card](docs/screenshot-suggested.png)
 
 ## Why
 
@@ -43,19 +46,20 @@ without breaking your scroll.
 
 ## Features
 
-- **Save** — saves the post to your **real LinkedIn Saved items** (not a separate
-  list). The bookmark fills and stays filled; click again to unsave. On a post's
-  own page it shows the already-saved state on load.
-- **Copy link** — copies the post's canonical LinkedIn link (the same
-  `lnkd.in/…` short link as *… → Copy link to post*).
+- **Save** — uses LinkedIn's own **Save harness** to save the post to your **real
+  LinkedIn Saved items** (not a separate list). The bookmark fills and stays
+  filled; click again to unsave. On a post's own page it shows the already-saved
+  state on load.
+- **Copy link** — uses LinkedIn's own **Copy-link harness** to copy the post's
+  canonical link (the same `lnkd.in/…` short link as *… → Copy link to post*).
 - **Open in a new tab** — opens the post on its own page. **Background** tab by
   default; hold **⌘/Ctrl** to do the opposite for one click. Hidden on a post's
   own page, since you're already there.
-- **Native look** — each button is cloned from the post's own `…` button, so it
-  matches LinkedIn's size, spacing, hover circle, and **theme color** (follows the
-  in-app dark/light toggle live, no reload).
-- **No menu flicker** — Save and Copy work by driving LinkedIn's own `…` menu
-  items, but the menu is kept hidden the whole time, so nothing visibly pops up.
+- **Native everything** — each button is cloned from the post's own `…` button, so
+  it matches LinkedIn's size, spacing, hover circle, and **theme color** (follows
+  the in-app dark/light toggle live, no reload). And because Save and Copy fire
+  LinkedIn's own menu actions, you get the real behavior — the menu is just kept
+  hidden the whole time, so nothing visibly pops up.
 - **Works across feed layouts** — home feed (both sorts), profiles, activity
   pages, reposts, and social-proof cards ("X likes this"), in any UI language
   (controls are matched by stable icon, not English labels).
