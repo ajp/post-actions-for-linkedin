@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Open Post in New Tab for LinkedIn",
+  "name": "Post Actions for LinkedIn",
   "version": "1.2.0",
   "default_locale": "en",
   "description": "Adds a quick-action toolbar to every LinkedIn feed post: Save, Copy link, and Open in a new tab.",
@@ -11,7 +11,7 @@
   },
   "permissions": ["storage"],
   "action": {
-    "default_title": "Open Post in New Tab — settings",
+    "default_title": "Post Actions for LinkedIn — settings",
     "default_popup": "options.html",
     "default_icon": {
       "16": "icons/icon16.png",

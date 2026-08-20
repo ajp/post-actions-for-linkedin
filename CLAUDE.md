@@ -23,7 +23,7 @@ files loaded directly.
 - **Package a release zip** (only the runtime files ship; `git ls-files` shows
   the rest are docs/store assets):
   ```sh
-  zip -r linkedin-open-post-in-new-tab.zip \
+  zip -r post-actions-for-linkedin.zip \
     manifest.json content.js background.js options.html options.js styles.css \
     README.md icons/icon16.png icons/icon48.png icons/icon128.png \
     _locales/en/messages.json

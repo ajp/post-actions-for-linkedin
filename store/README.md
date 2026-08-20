@@ -23,10 +23,7 @@ At least one 1280×800 (or 640×400) screenshot is required; up to 5 are allowed
 
 ## Listing copy
 
-**Name:** Open Post in New Tab for LinkedIn
-
-> Consider renaming to reflect the toolbar (e.g. "Post Quick Actions for
-> LinkedIn") — the current name now undersells Save and Copy.
+**Name:** Post Actions for LinkedIn
 
 **Summary** (≤132 chars):
 > A quick-action toolbar on every LinkedIn post: Save, Copy link, and Open in a new tab — one click each. No tracking.

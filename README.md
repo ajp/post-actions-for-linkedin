@@ -1,4 +1,4 @@
-# LinkedIn — Post Quick Actions
+# Post Actions for LinkedIn
 
 A tiny Chrome/Chromium extension that adds a small **quick-action toolbar** to
 every LinkedIn feed post — **Save**, **Copy link**, and **Open in a new tab** —
