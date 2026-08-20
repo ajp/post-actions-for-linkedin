@@ -27,9 +27,9 @@ Saved — the bookmark fills and stays filled (click again to unsave):
 ![The toolbar with the bookmark filled, indicating the post is saved](docs/screenshot-saved.png)
 
 Because they trigger LinkedIn's own actions, Save and Copy surface LinkedIn's
-**native notifications** — like Copy's "Link copied to clipboard" toast:
+**native notifications** — "Post saved." and "Link copied to clipboard.":
 
-![LinkedIn's native "Link copied to clipboard" notification toast](docs/screenshot-copy.png)
+![LinkedIn's native "Post saved." and "Link copied to clipboard." notification toasts](docs/screenshot-notifications.png)
 
 Works on every kind of post, including "Suggested" cards:
 
