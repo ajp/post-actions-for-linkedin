@@ -26,11 +26,10 @@ Saved — the bookmark fills and stays filled (click again to unsave):
 
 ![The toolbar with the bookmark filled, indicating the post is saved](docs/screenshot-saved.png)
 
-Save and Copy trigger LinkedIn's **own** Save and Copy actions, so you get its
-real behavior — here, Copy fires LinkedIn's copy action and its "Link copied"
-confirmation:
+Because they trigger LinkedIn's own actions, Save and Copy surface LinkedIn's
+**native notifications** — like Copy's "Link copied to clipboard" toast:
 
-![A post showing the copy checkmark and LinkedIn's "Link copied to clipboard" toast](docs/screenshot-copy.png)
+![LinkedIn's native "Link copied to clipboard" notification toast](docs/screenshot-copy.png)
 
 Works on every kind of post, including "Suggested" cards:
 
@@ -90,34 +89,16 @@ whether **Open** uses a **background** tab (default) or a **foreground** tab. Ho
 
 ## How it works
 
-For each post the content script finds the `…` (overflow) button — matched by its
-stable `svg#overflow-web-ios-small` icon **and** localized `aria-label`, with
-comment menus filtered out — and injects a toolbar of buttons **cloned** from it.
-Cloning inherits LinkedIn's exact size, alignment, spacing, and hover treatment
-for whatever build/layout is live, instead of chasing LinkedIn's randomized,
-per-build class names. A scoped, coalesced `MutationObserver` re-scans as the
-virtualized feed streams posts in.
-
-Each action gets its link/state differently:
-
-- **Open** reads the post's canonical share URN from the `…` menu's **Embed**
-  reference (`…targetUrn=urn:li:share:<id>`), which is correct even on cards where
-  the card-derived URN isn't (e.g. social-proof). It opens the hidden menu only to
-  read that href — **no clipboard access** — and falls back to the card-derived
-  permalink (`…/feed/update/urn:li:<type>:<id>/`, decoding the URL-encoded URN the
-  main feed uses) if there's no Embed item.
-- **Copy** and **Save** drive LinkedIn's own `…` menu items — matched by their
-  stable icons (`link-*` for Copy link, `bookmark-*` for Save/Unsave) rather than
-  localized text. The menu is opened programmatically but kept hidden (a
-  `MutationObserver` hides the dropdown container from its first frame), the item
-  is clicked, and the menu is dismissed — so LinkedIn performs the real action
-  with no visible flicker. On a post's own permalink page, Save reads its current
-  state once from that menu so an already-saved post shows filled on load.
-
-Opening a tab is handled by a tiny **service worker** (`chrome.tabs.create`) so it
-can place the tab in the background — something a content script's `window.open`
-can't do — and it only ever opens LinkedIn hosts (`…/feed/update/`, `…/posts/`,
-`lnkd.in/`).
+- **Inject:** find each post's `…` button (by its stable `svg#overflow-web-ios-small`
+  icon + `aria-label`, comment menus excluded) and insert a toolbar **cloned** from
+  it; a scoped `MutationObserver` re-scans the virtualized feed.
+- **Save / Copy:** programmatically click LinkedIn's own `…` menu items — matched by
+  stable icon (`bookmark-*`, `link-*`), with the dropdown hidden from its first frame
+  so nothing flickers. On a post's own page, Save reads its state from that menu.
+- **Open:** read the share URN from the menu's Embed `href` (no clipboard) and open
+  `…/feed/update/urn:li:share:<id>/` via a service-worker `chrome.tabs.create`
+  (backgroundable; restricted to LinkedIn hosts), falling back to the card-derived
+  permalink.
 
 ## Privacy
 
