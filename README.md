@@ -26,8 +26,8 @@ Saved — the bookmark fills and stays filled (click again to unsave):
 
 ![The toolbar with the bookmark filled, indicating the post is saved](docs/screenshot-saved.png)
 
-Save and Copy run LinkedIn's **own** save/copy harnesses, so you get its real
-behavior — here, Copy fires LinkedIn's copy action and its "Link copied"
+Save and Copy trigger LinkedIn's **own** Save and Copy actions, so you get its
+real behavior — here, Copy fires LinkedIn's copy action and its "Link copied"
 confirmation:
 
 ![A post showing the copy checkmark and LinkedIn's "Link copied to clipboard" toast](docs/screenshot-copy.png)
@@ -46,11 +46,11 @@ without breaking your scroll.
 
 ## Features
 
-- **Save** — uses LinkedIn's own **Save harness** to save the post to your **real
-  LinkedIn Saved items** (not a separate list). The bookmark fills and stays
-  filled; click again to unsave. On a post's own page it shows the already-saved
-  state on load.
-- **Copy link** — uses LinkedIn's own **Copy-link harness** to copy the post's
+- **Save** — triggers LinkedIn's own **Save action** to save the post to your
+  **real LinkedIn Saved items** (not a separate list). The bookmark fills and
+  stays filled; click again to unsave. On a post's own page it shows the
+  already-saved state on load.
+- **Copy link** — triggers LinkedIn's own **Copy link action** to copy the post's
   canonical link (the same `lnkd.in/…` short link as *… → Copy link to post*).
 - **Open in a new tab** — opens the post on its own page. **Background** tab by
   default; hold **⌘/Ctrl** to do the opposite for one click. Hidden on a post's
