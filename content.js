@@ -37,6 +37,14 @@
   const OVERFLOW_SELECTOR =
     'button[aria-label^="Open control menu for post"], button:has(svg#overflow-web-ios-small)';
 
+  // LinkedIn also tags always-mounted left-rail cards (e.g. "Saved items", whose
+  // bookmark icon would fool a bare '[role="menu"] svg') and video players'
+  // settings lists as role="menu" — so menu lookups go through a menuitem, and
+  // "a … menu is open" means a menuitem carrying a LinkedIn icon (video
+  // settings items have none).
+  const MENU_ITEM = '[role="menu"] [role="menuitem"]';
+  const OPEN_MENU_ITEM = MENU_ITEM + " svg[id]";
+
   // A post's URL can appear in several link shapes across LinkedIn's layouts:
   //   /feed/update/urn:li:activity:123/          (profile posts)
   //   /feed/update/urn:li:share:123/             (main feed shares)
@@ -172,7 +180,7 @@
 
   const SVG_NS = "http://www.w3.org/2000/svg";
   const COPY_FEEDBACK_MS = 1200; // how long a button flashes its "done" glyph
-  const SAVE_MENU_TRIES = 10; // poll attempts to find a menu item after opening …
+  const SAVE_MENU_TRIES = 30; // poll attempts to find a menu item after opening …
   const SAVE_MENU_POLL_MS = 100; // delay between those attempts
   // Toolbar glyphs. Most are on a 16x16 viewBox to match LinkedIn's own icons;
   // Save reuses LinkedIn's native bookmark glyph, which is authored at 24x24
@@ -512,7 +520,7 @@
     }
     let tries = 0;
     const tick = () => {
-      const icon = document.querySelector('[role="menu"] svg[id^="link-"]');
+      const icon = document.querySelector(MENU_ITEM + ' svg[id^="link-"]');
       const item = icon && icon.closest('[role="menuitem"]');
       if (item) {
         item.click(); // LinkedIn copies the canonical link to the clipboard
@@ -533,7 +541,7 @@
   /** The open … menu's Save item, identified by its bookmark icon (covers both
    *  the "Save" (bookmark-outline) and "Unsave" (bookmark-fill) states). */
   function findSaveMenuItem() {
-    const icons = document.querySelectorAll('[role="menu"] svg[id^="bookmark-"]');
+    const icons = document.querySelectorAll(MENU_ITEM + ' svg[id^="bookmark-"]');
     for (const icon of icons) {
       const item = icon.closest('[role="menuitem"]');
       if (item) return item;
@@ -561,9 +569,11 @@
       suppressMenus(false);
       return;
     }
+    const turn = menuTurn;
     let tries = 0;
     const tick = () => {
-      const icon = document.querySelector('[role="menu"] svg[id^="bookmark-"]');
+      if (turn !== menuTurn) return; // superseded — the newer interaction ends it
+      const icon = document.querySelector(MENU_ITEM + ' svg[id^="bookmark-"]');
       if (icon) {
         const saved = /fill/i.test(icon.getAttribute("id") || "");
         setSavedState(btn, saved, label);
@@ -583,6 +593,10 @@
   // loading spinner LinkedIn shows first while the items stream in.
   const POPOVER_HINT = '[role="menu"], [role="progressbar"], .artdeco-loader';
   let menuHideObserver = null;
+  // Bumped each time we start driving a menu, so a stale poller (e.g. a prime
+  // whose toolbar React replaced right after load) can tell a newer interaction
+  // owns the open menu and stand down instead of closing it.
+  let menuTurn = 0;
 
   /** Hide the popover that contains `node` from its first frame: walk up to the
    *  nearest positioned ancestor (the dropdown surface) and hide that, so even
@@ -611,6 +625,7 @@
   function suppressMenus(on) {
     document.documentElement.classList.toggle("lnt-suppress-menu", !!on);
     if (on) {
+      menuTurn++;
       if (!menuHideObserver) {
         menuHideObserver = new MutationObserver((records) => {
           for (const r of records) {
@@ -619,7 +634,7 @@
               const hit = node.matches?.(POPOVER_HINT)
                 ? node
                 : node.querySelector?.(POPOVER_HINT);
-              if (hit) hidePopover(hit);
+              if (hit && !hit.closest("aside")) hidePopover(hit); // not left-rail cards
             }
           }
         });
@@ -644,7 +659,7 @@
     dismissMenu();
     let tries = 0;
     const reveal = () => {
-      if (!document.querySelector('[role="menu"]') || ++tries > 40) {
+      if (!document.querySelector(OPEN_MENU_ITEM) || ++tries > 40) {
         suppressMenus(false);
       } else {
         setTimeout(reveal, 30);

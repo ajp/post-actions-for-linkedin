@@ -7,3 +7,6 @@ linkedin-open-post-in-new-tab.zip
 
 # Editor / misc
 *.log
+
+# Local Playwright test harness (profile holds a LinkedIn session)
+.harness/
