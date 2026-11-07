@@ -8,17 +8,32 @@
  */
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (!msg || msg.type !== "lnt-open" || typeof msg.url !== "string") return;
-  // Only ever open LinkedIn links: canonical post permalinks (…/feed/update/…,
-  // …/posts/…) and LinkedIn's own lnkd.in short links (what "Copy link to post"
-  // produces). Restricting to these hosts keeps a page-supplied URL from
-  // pointing the new tab anywhere off-LinkedIn.
-  if (!/^https:\/\/(www\.linkedin\.com\/(feed\/update\/|posts\/)|lnkd\.in\/)/.test(msg.url)) return;
+  // Only ever open LinkedIn post permalinks (…/feed/update/…, …/posts/…), so a
+  // page-supplied URL can't point the new tab anywhere else. Check the PARSED
+  // URL: Chrome normalizes dot-segments before navigating, so a raw-string match
+  // would pass e.g. /feed/update/../../redir/redirect?url=… .
+  let u;
+  try {
+    u = new URL(msg.url);
+  } catch (e) {
+    return;
+  }
+  if (
+    u.protocol !== "https:" ||
+    u.hostname !== "www.linkedin.com" ||
+    u.port ||
+    u.username ||
+    u.password ||
+    !/^\/(feed\/update|posts)\//.test(u.pathname)
+  ) {
+    return;
+  }
   const tab = sender.tab;
   const open = (openMode) => {
     let active = openMode === "foreground";
     if (msg.toggle) active = !active; // ⌘/Ctrl-click inverts for one click
     chrome.tabs.create({
-      url: msg.url,
+      url: u.href,
       active,
       openerTabId: tab ? tab.id : undefined,
       index: tab ? tab.index + 1 : undefined, // place just after the current tab

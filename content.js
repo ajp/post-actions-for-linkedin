@@ -357,15 +357,19 @@
     }
     suppressMenus(true); // hide the dropdown before it paints
     try {
-      overflowBtn.click(); // open the … dropdown (mounts async, but hidden)
+      openOverflowMenu(overflowBtn); // open the … dropdown (mounts async, but hidden)
     } catch (e) {
       suppressMenus(false);
       openTab(fallbackUrl, toggle);
       return;
     }
+    const turn = menuTurn;
     let tries = 0;
     const tick = () => {
-      const url = menuPostUrl(); // canonical permalink from the Embed href
+      // Superseded by a newer menu interaction: the open menu may be another
+      // post's, so don't read it — use the derived URL; the newer one ends it.
+      if (turn !== menuTurn) return openTab(fallbackUrl, toggle);
+      const url = menuIsFor(parent) && menuPostUrl(); // canonical permalink from the Embed href
       if (url) {
         endMenuInteraction();
         openTab(url, toggle);
@@ -468,14 +472,16 @@
     if (!overflowBtn) return;
     suppressMenus(true); // hide the dropdown before it paints
     try {
-      overflowBtn.click(); // open the … dropdown (mounts async, but hidden)
+      openOverflowMenu(overflowBtn); // open the … dropdown (mounts async, but hidden)
     } catch (e) {
       suppressMenus(false);
       return;
     }
+    const turn = menuTurn;
     let tries = 0;
     const tick = () => {
-      const item = findSaveMenuItem();
+      if (turn !== menuTurn) return; // superseded — never toggle another post's Save
+      const item = menuIsFor(parent) && findSaveMenuItem();
       if (item) {
         item.click(); // triggers LinkedIn's own Save/Unsave; closes the menu itself
         // Optimistically toggle our own saved state: not-saved → saved (stays
@@ -512,15 +518,20 @@
     }
     suppressMenus(true); // hide the dropdown before it paints
     try {
-      overflowBtn.click(); // open the … dropdown (mounts async, but hidden)
+      openOverflowMenu(overflowBtn); // open the … dropdown (mounts async, but hidden)
     } catch (e) {
       suppressMenus(false);
       if (fallbackUrl) copyLink(fallbackUrl, btn, label);
       return;
     }
+    const turn = menuTurn;
     let tries = 0;
     const tick = () => {
-      const icon = document.querySelector(MENU_ITEM + ' svg[id^="link-"]');
+      if (turn !== menuTurn) {
+        if (fallbackUrl) copyLink(fallbackUrl, btn, label); // superseded → derived URL
+        return;
+      }
+      const icon = menuIsFor(parent) && document.querySelector(MENU_ITEM + ' svg[id^="link-"]');
       const item = icon && icon.closest('[role="menuitem"]');
       if (item) {
         item.click(); // LinkedIn copies the canonical link to the clipboard
@@ -564,7 +575,7 @@
     if (!overflowBtn) return;
     suppressMenus(true); // hide the dropdown before it paints
     try {
-      overflowBtn.click(); // open the … dropdown (mounts async, but hidden)
+      openOverflowMenu(overflowBtn); // open the … dropdown (mounts async, but hidden)
     } catch (e) {
       suppressMenus(false);
       return;
@@ -573,7 +584,7 @@
     let tries = 0;
     const tick = () => {
       if (turn !== menuTurn) return; // superseded — the newer interaction ends it
-      const icon = document.querySelector(MENU_ITEM + ' svg[id^="bookmark-"]');
+      const icon = menuIsFor(parent) && document.querySelector(MENU_ITEM + ' svg[id^="bookmark-"]');
       if (icon) {
         const saved = /fill/i.test(icon.getAttribute("id") || "");
         setSavedState(btn, saved, label);
@@ -666,6 +677,21 @@
       }
     };
     setTimeout(reveal, 30);
+  }
+
+  /** Open a post's … menu, first closing any menu another action left open —
+   *  menu lookups are document-wide, so only one may be open at a time. */
+  function openOverflowMenu(overflowBtn) {
+    if (document.querySelector(OPEN_MENU_ITEM)) dismissMenu();
+    overflowBtn.click();
+  }
+
+  /** Whether the open menu belongs to the post whose toolbar is `parent`: its
+   *  live … button (re-resolved; React can swap it) reports aria-expanded. A
+   *  layout without aria-expanded can't be checked, so it's trusted. */
+  function menuIsFor(parent) {
+    const ov = parent && parent.querySelector(OVERFLOW_SELECTOR);
+    return !!ov && (!ov.hasAttribute("aria-expanded") || ov.getAttribute("aria-expanded") === "true");
   }
 
   /** Close any open dropdown by sending Escape (artdeco menus listen for it). */

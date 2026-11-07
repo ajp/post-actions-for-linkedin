@@ -41,8 +41,8 @@ Three cooperating pieces, message-passing between them:
   message on Open click and calls `chrome.tabs.create`. This exists *only* because a
   content script's `window.open` cannot place a tab in the background or right
   after the current tab; `chrome.tabs.create` can, and needs no permission. It
-  hard-validates the URL against LinkedIn hosts (`…/feed/update/`, `…/posts/`,
-  `lnkd.in/`).
+  hard-validates the *parsed* URL: `https://www.linkedin.com` with a
+  `/feed/update/` or `/posts/` path (after dot-segment normalization).
 - **`options.html` / `options.js`** — settings page *and* toolbar popup (same file
   for both). Persists one preference, `openMode` (`background`|`foreground`), to
   `chrome.storage.sync`; `background.js` reads it per Open. `⌘/Ctrl`-click on Open
