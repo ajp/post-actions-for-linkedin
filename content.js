@@ -83,6 +83,16 @@
     return m ? m[1] : null;
   }
 
+  /** True if any attribute value inside `root` contains `needle`. */
+  function attrsMention(root, needle) {
+    for (const el of root.querySelectorAll("*")) {
+      for (const a of el.attributes) {
+        if (a.value.indexOf(needle) !== -1) return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * True if this overflow button belongs to a COMMENT, not the post itself.
    * Comment menus use the same overflow icon, so we exclude them: walking up,
@@ -767,13 +777,15 @@
     // here, so Open is redundant. Match by post id — and because a card can derive
     // a different URN *type* than the page URL (activity vs share resolve to the
     // same post), also treat it as our own page when the page's id appears in this
-    // card. Other posts on a detail page (recommendations) won't contain it.
+    // card's markup. Other posts on a detail page (recommendations) won't contain
+    // it. Attributes only: the card's text is user content, so a post merely
+    // quoting the id mustn't count.
     const pageId = postIdOf(extractPostUrl(location.href));
     const ownCard = overflowBtn.closest('[role="listitem"]');
     const onOwnPage =
       pageId !== null &&
       (postIdOf(url) === pageId ||
-        (ownCard && ownCard.innerHTML.indexOf(pageId) !== -1));
+        (ownCard && attrsMention(ownCard, pageId)));
     const actions = [
       {
         className: "lnt-save-btn",

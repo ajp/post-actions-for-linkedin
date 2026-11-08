@@ -1,5 +1,6 @@
 /** Options page / popup: persist the default open mode (background/foreground). */
 const DEFAULTS = { openMode: "background" };
+const OPEN_MODES = ["background", "foreground"];
 // chrome.storage is present only with the "storage" permission active. Guard so
 // a stale load (permission not yet registered) degrades instead of throwing.
 const store =
@@ -22,9 +23,8 @@ function restore() {
     return;
   }
   store.get(DEFAULTS, (items) => {
-    const el = document.querySelector(
-      'input[name="openMode"][value="' + items.openMode + '"]'
-    );
+    const mode = OPEN_MODES.includes(items.openMode) ? items.openMode : DEFAULTS.openMode;
+    const el = document.querySelector('input[name="openMode"][value="' + mode + '"]');
     if (el) el.checked = true;
   });
 }
