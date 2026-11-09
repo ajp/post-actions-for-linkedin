@@ -623,13 +623,20 @@
    *  nearest positioned ancestor (the dropdown surface) and hide that, so even
    *  the pre-menu spinner phase never paints. Marked so we can restore it. */
   function hidePopover(node) {
+    // LinkedIn also shows a spinner INSIDE the … button while the menu loads.
+    // Never hide anything in a post card: with no positioned ancestor below the
+    // card, the walk would otherwise hide the whole post (it visibly blinks).
+    // In-card dropdowns of older layouts are covered by the CSS rule instead.
+    if (node.closest('[role="listitem"]')) return;
     let el = node;
     for (let i = 0; el && el !== document.body && i < 8; i++) {
       const pos = getComputedStyle(el).position;
       if (pos === "fixed" || pos === "absolute") break;
       el = el.parentElement;
     }
-    const target = el && el !== document.body ? el : node;
+    // No dropdown surface found → hide nothing rather than some random ancestor.
+    if (!el || el === document.body) return;
+    const target = el;
     if (target.getAttribute("data-lnt-hidden") === "1") return;
     target.setAttribute("data-lnt-hidden", "1");
     target.style.setProperty("visibility", "hidden", "important");
