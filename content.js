@@ -37,13 +37,39 @@
   const OVERFLOW_SELECTOR =
     'button[aria-label^="Open control menu for post"], button:has(svg#overflow-web-ios-small)';
 
-  // LinkedIn also tags always-mounted left-rail cards (e.g. "Saved items", whose
-  // bookmark icon would fool a bare '[role="menu"] svg') and video players'
-  // settings lists as role="menu" — so menu lookups go through a menuitem, and
-  // "a … menu is open" means a menuitem carrying a LinkedIn icon (video
-  // settings items have none).
-  const MENU_ITEM = '[role="menu"] [role="menuitem"]';
-  const OPEN_MENU_ITEM = MENU_ITEM + " svg[id]";
+  // An open … menu's items, in either layout:
+  //  - feed/profile: [role="menu"] > [role="menuitem"], icon named by svg id.
+  //    LinkedIn also tags always-mounted left-rail cards (e.g. "Saved items",
+  //    whose bookmark icon would fool a bare '[role="menu"] svg') and video
+  //    settings lists as role="menu", so lookups go through a menuitem, and
+  //    only items carrying a named icon count (video settings items have none).
+  //  - older layout (company/brand Posts pages): an open artdeco dropdown whose
+  //    items are [role="button"], icon named by svg data-test-icon.
+  const MENU_ITEM =
+    '[role="menu"] [role="menuitem"], .artdeco-dropdown__content--is-open [role="button"]';
+  const OPEN_MENU_ITEM =
+    '[role="menu"] [role="menuitem"] svg[id], ' +
+    '.artdeco-dropdown__content--is-open [role="button"] svg[data-test-icon]';
+
+  /** The open menu's item whose icon name starts with `prefix` (e.g. "bookmark-",
+   *  "link-") — locale-independent — and that icon's name; or null. */
+  function findMenuItem(prefix) {
+    const icon = document.querySelector(
+      `[role="menu"] [role="menuitem"] svg[id^="${prefix}"], ` +
+        `.artdeco-dropdown__content--is-open [role="button"] svg[data-test-icon^="${prefix}"]`
+    );
+    const item = icon && icon.closest(MENU_ITEM);
+    return item
+      ? { item, icon: icon.getAttribute("id") || icon.getAttribute("data-test-icon") || "" }
+      : null;
+  }
+
+  // A post's card: role="listitem" on the feed/profile layouts; the older layout
+  // (company/brand "Posts" pages) instead marks each post with its URN in
+  // data-urn on a role="article" element and has no listitem at all.
+  const POST_CARD =
+    '[role="listitem"], [data-urn^="urn:li:activity:"], ' +
+    '[data-urn^="urn:li:share:"], [data-urn^="urn:li:ugcPost:"]';
 
   // A post's URL can appear in several link shapes across LinkedIn's layouts:
   //   /feed/update/urn:li:activity:123/          (profile posts)
@@ -106,7 +132,7 @@
         (n.getAttribute("data-testid") || "") +
         (n.id || "");
       if (/comment/i.test(tag)) return true;
-      if (n.getAttribute("role") === "listitem") return false; // post boundary
+      if (n.matches(POST_CARD)) return false; // post boundary
     }
     return false;
   }
@@ -163,7 +189,8 @@
    * walking ancestors until one contains a post link — always the *closest*
    * ancestor, so we never grab a neighbouring post's URL.
    *
-   * The walk is BOUNDED to the post's own card (role="listitem"), with a depth
+   * A card that carries its URN (data-urn, older layout) answers directly.
+   * Otherwise the walk is BOUNDED to the post's own card (POST_CARD), with a depth
    * cap as a fallback. Without this, a card that has no permalink of its own
    * (e.g. the "Most Recommended" feed sort) would make the walk climb into a
    * shared feed container and return the FIRST post link in the whole feed — so
@@ -171,7 +198,9 @@
    * card, we fall back to decoding the activity id from the card's token.
    */
   function findPostUrl(overflowBtn) {
-    const card = overflowBtn.closest('[role="listitem"]');
+    const card = overflowBtn.closest(POST_CARD);
+    const urn = card && extractPostUrl(card.getAttribute("data-urn"));
+    if (urn) return urn;
     let node = overflowBtn.parentElement;
     let depth = 0;
     while (node && node !== document.body && depth < MAX_WALK_DEPTH) {
@@ -196,7 +225,9 @@
   // Save reuses LinkedIn's native bookmark glyph, which is authored at 24x24
   // (setGlyph scales it to a 16px box via the per-icon viewBox).
   const ICON_PATHS = {
-    open: "M9 1v2h2.59L6.3 8.29l1.41 1.41L13 4.41V7h2V1zM11 13H3V5h4V3H3a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9h-2z",
+    // Open-in-new on a 24x24 grid with 2-unit strokes — the same weight as
+    // LinkedIn's bookmark (a 16-grid version with 2-unit strokes read bolder).
+    open: "M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3z",
     copy: "M5.5 3.5A1.5 1.5 0 0 1 7 2h5a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 12 12h-.5v-1H12a.5.5 0 0 0 .5-.5v-7A.5.5 0 0 0 12 3H7a.5.5 0 0 0-.5.5V4h-1v-.5zM3.5 5A1.5 1.5 0 0 0 2 6.5v7A1.5 1.5 0 0 0 3.5 15h5A1.5 1.5 0 0 0 10 13.5v-7A1.5 1.5 0 0 0 8.5 5h-5zM3 6.5A.5.5 0 0 1 3.5 6h5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-.5.5h-5a.5.5 0 0 1-.5-.5v-7z",
     check: "M13.5 4.5l-7 7L3 8l1-1 2.5 2.5L12.5 3.5z",
     // LinkedIn's own bookmark-outline glyph (matches the menu's Save item).
@@ -204,7 +235,7 @@
     // Filled bookmark, shown briefly after a successful save (24x24 like save).
     saveDone: "M19 5a3 3 0 0 0-3-3H5v20l7-6.29L19 22z",
   };
-  const ICON_VIEWBOX = { save: "0 0 24 24", saveDone: "0 0 24 24" }; // default 0 0 16 16
+  const ICON_VIEWBOX = { save: "0 0 24 24", saveDone: "0 0 24 24", open: "0 0 24 24" }; // default 0 0 16 16
   // Native LinkedIn icons paint with fill="currentColor", so currentColor is the
   // theme-correct color and it FOLLOWS LinkedIn's in-app dark/light toggle (which
   // doesn't reload the page). Set inline with !important so it still beats each
@@ -491,7 +522,8 @@
     let tries = 0;
     const tick = () => {
       if (turn !== menuTurn) return; // superseded — never toggle another post's Save
-      const item = menuIsFor(parent) && findSaveMenuItem();
+      const found = menuIsFor(parent) && findMenuItem("bookmark-");
+      const item = found && found.item;
       if (item) {
         item.click(); // triggers LinkedIn's own Save/Unsave; closes the menu itself
         // Optimistically toggle our own saved state: not-saved → saved (stays
@@ -541,8 +573,8 @@
         if (fallbackUrl) copyLink(fallbackUrl, btn, label); // superseded → derived URL
         return;
       }
-      const icon = menuIsFor(parent) && document.querySelector(MENU_ITEM + ' svg[id^="link-"]');
-      const item = icon && icon.closest('[role="menuitem"]');
+      const found = menuIsFor(parent) && findMenuItem("link-");
+      const item = found && found.item;
       if (item) {
         item.click(); // LinkedIn copies the canonical link to the clipboard
         flashCopied(btn, label);
@@ -557,17 +589,6 @@
       }
     };
     setTimeout(tick, SAVE_MENU_POLL_MS);
-  }
-
-  /** The open … menu's Save item, identified by its bookmark icon (covers both
-   *  the "Save" (bookmark-outline) and "Unsave" (bookmark-fill) states). */
-  function findSaveMenuItem() {
-    const icons = document.querySelectorAll(MENU_ITEM + ' svg[id^="bookmark-"]');
-    for (const icon of icons) {
-      const item = icon.closest('[role="menuitem"]');
-      if (item) return item;
-    }
-    return null;
   }
 
   /**
@@ -594,9 +615,9 @@
     let tries = 0;
     const tick = () => {
       if (turn !== menuTurn) return; // superseded — the newer interaction ends it
-      const icon = menuIsFor(parent) && document.querySelector(MENU_ITEM + ' svg[id^="bookmark-"]');
-      if (icon) {
-        const saved = /fill/i.test(icon.getAttribute("id") || "");
+      const found = menuIsFor(parent) && findMenuItem("bookmark-");
+      if (found) {
+        const saved = /fill/i.test(found.icon);
         setSavedState(btn, saved, label);
         endMenuInteraction();
         return;
@@ -627,7 +648,7 @@
     // Never hide anything in a post card: with no positioned ancestor below the
     // card, the walk would otherwise hide the whole post (it visibly blinks).
     // In-card dropdowns of older layouts are covered by the CSS rule instead.
-    if (node.closest('[role="listitem"]')) return;
+    if (node.closest(POST_CARD)) return;
     let el = node;
     for (let i = 0; el && el !== document.body && i < 8; i++) {
       const pos = getComputedStyle(el).position;
@@ -788,7 +809,7 @@
     // it. Attributes only: the card's text is user content, so a post merely
     // quoting the id mustn't count.
     const pageId = postIdOf(extractPostUrl(location.href));
-    const ownCard = overflowBtn.closest('[role="listitem"]');
+    const ownCard = overflowBtn.closest(POST_CARD);
     const onOwnPage =
       pageId !== null &&
       (postIdOf(url) === pageId ||
@@ -816,8 +837,9 @@
         className: "lnt-open-btn",
         label: openLabel,
         iconD: ICON_PATHS.open,
-        // Open the same link Copy produces (LinkedIn's short link, read back from
-        // the clipboard); falls back to a canonical permalink. toggle captured now.
+        iconViewBox: ICON_VIEWBOX.open,
+        // Permalink from the menu's Embed item, else the derived one. No clipboard
+        // access. toggle (⌘/Ctrl) is captured now, before going async.
         onClick: (e, btn) => openViaMenu(btn, url, e.metaKey || e.ctrlKey),
       });
     }

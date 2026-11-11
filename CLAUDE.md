@@ -57,11 +57,20 @@ post's permalink streams in). The whole design works around this:
 - **Finding the `…` button** (`OVERFLOW_SELECTOR`): matched by localized
   `aria-label` **and** by the stable `svg#overflow-web-ios-small` icon id (so
   non-English locales work). Comment menus reuse that icon, so `isCommentContext()`
-  filters them out by walking up to the `role="listitem"` post boundary.
+  filters them out by walking up to the post boundary (`POST_CARD`).
+- **Two layouts.** The feed and profile/activity pages are React: each post card is
+  `role="listitem"` and its `…` opens a `[role="menu"]` of `[role="menuitem"]`s
+  whose icons are named by `svg[id]`. Company/brand **Posts** pages
+  (`/company/<x>/posts/`) still use the older Ember layout: the card is
+  `role="article"` with the post URN in `data-urn` (no listitem, no permalink
+  anchors), and `…` opens an `.artdeco-dropdown__content--is-open` of
+  `[role="button"]` items whose icons are named by `svg[data-test-icon]`.
+  `POST_CARD`, `MENU_ITEM`/`OPEN_MENU_ITEM` and `findMenuItem()` cover both.
 - **Finding the permalink** (`findPostUrl` → `extractPostUrl`): the URN appears in
   different link shapes per surface — a plain anchor on profile/activity pages,
   but **URL-encoded in a query param** (`highlightedUpdateUrn=urn%3Ali%3A…`) on
-  the main feed, so hrefs are `decodeURIComponent`'d before regex-matching. The
+  the main feed, so hrefs are `decodeURIComponent`'d before regex-matching. A
+  card's own `data-urn` (older layout) wins outright. The
   ancestor walk is **bounded to the post's own card** so a card with no permalink
   never grabs a neighbor's URL.
 - **"Most Recommended" fallback** (`activityUrlFromToken`): those cards expose no
@@ -86,11 +95,17 @@ post's permalink streams in). The whole design works around this:
   state on a post's own page. The live `…` is re-resolved at click time (React can
   swap the node).
 - **Hidden menu** (`suppressMenus` + `styles.css`): menus we drive must never flash.
-  A root class hides `[role="menu"]`, and — because LinkedIn paints a spinner
+  A root class hides `[role="menu"]` (except the left rail's always-mounted
+  `role="menu"` cards inside `<aside>`), and — because LinkedIn paints a spinner
   container *before* `role="menu"` exists — a `MutationObserver` hides the dropdown's
-  positioned ancestor from its first frame. `endMenuInteraction` reveals only once no
-  `[role="menu"]` remains in the DOM. `element.click()` works on hidden nodes, so the
-  actions still fire.
+  positioned ancestor from its first frame. It never hides anything inside a post
+  card (LinkedIn also puts a spinner *in* the `…` button; hiding its ancestor blanked
+  the whole post). The older layout's artdeco dropdown renders its items only while
+  visible, so it's hidden with **`opacity:0`, not `visibility:hidden`**.
+  `endMenuInteraction` reveals once no open menu item (`OPEN_MENU_ITEM`) remains.
+  `element.click()` works on hidden nodes, so the actions still fire. Each
+  interaction bumps `menuTurn`, and pollers stand down when superseded;
+  `menuIsFor()` reads a menu only while its own `…` is `aria-expanded`.
 - **Placement**: buttons inserted before `…` for order `[save][copy][open][…][X]`
   (Open dropped on the post's own page). The leftmost is the single
   `margin-inline-start:auto` push point; siblings to its right are zeroed, so the row
@@ -107,7 +122,8 @@ post's permalink streams in). The whole design works around this:
 Anything touching selectors, the URN shapes, the protobuf decode, the menu-item
 icons (`bookmark-*` / `link-*`), or button placement rides LinkedIn's private DOM
 and has historically taken several rounds to get right across all surfaces (main
-feed, profile, activity pages, social-proof cards, Most Recommended). Test on
+feed, profile, activity pages, company Posts pages, social-proof cards, Most
+Recommended). Test on
 multiple surfaces, not just one. `content.js` prints a one-time console warning if
 it finds overflow menus on a feed page but injects nothing — a signal a selector
 went stale.

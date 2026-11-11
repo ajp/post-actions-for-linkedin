@@ -15,9 +15,17 @@
    action and state read work unchanged. Scoped to a root class we toggle only
    for the brief window of that interaction. Left-rail cards are role="menu"
    too (always mounted), so those inside <aside> are excluded. */
-html.lnt-suppress-menu [role="menu"]:not(aside [role="menu"]),
-html.lnt-suppress-menu .artdeco-dropdown__content {
+html.lnt-suppress-menu [role="menu"]:not(aside [role="menu"]) {
   visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* The older layout's artdeco dropdown (company/brand Posts pages) renders its
+   items only while the dropdown is visible, so visibility:hidden leaves it
+   empty. Hide it with opacity alone; items still render and stay clickable
+   via element.click(). */
+html.lnt-suppress-menu .artdeco-dropdown__content {
   opacity: 0 !important;
   pointer-events: none !important;
 }
