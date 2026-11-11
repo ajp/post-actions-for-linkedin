@@ -54,17 +54,33 @@
     '[role="menu"] [role="menuitem"] svg[id], ' +
     '.artdeco-dropdown__content--is-open [role="button"] svg[data-test-icon]';
 
-  /** The open menu's item whose icon name starts with `prefix` (e.g. "bookmark-",
-   *  "link-") — locale-independent — and that icon's name; or null. */
-  function findMenuItem(prefix) {
-    const icon = document.querySelector(
-      `[role="menu"] [role="menuitem"] svg[id^="${prefix}"], ` +
-        `.artdeco-dropdown__content--is-open [role="button"] svg[data-test-icon^="${prefix}"]`
+  // Exact icon names of the menu items we drive (locale-independent). Exact,
+  // not a prefix: "link-" alone would also match e.g. link-external-*.
+  const SAVE_ICON = /^bookmark-(outline|fill)-(small|medium|large)$/;
+  const COPY_ICON = /^link-(outline-)?(small|medium|large)$/;
+
+  /** The open menu's item whose icon name matches `re`, and that icon's name;
+   *  or null. */
+  function findMenuItem(re) {
+    const icons = document.querySelectorAll(
+      '[role="menu"] [role="menuitem"] svg[id], ' +
+        '.artdeco-dropdown__content--is-open [role="button"] svg[data-test-icon]'
     );
-    const item = icon && icon.closest(MENU_ITEM);
-    return item
-      ? { item, icon: icon.getAttribute("id") || icon.getAttribute("data-test-icon") || "" }
-      : null;
+    for (const icon of icons) {
+      const name = icon.getAttribute("id") || icon.getAttribute("data-test-icon") || "";
+      const item = re.test(name) && icon.closest(MENU_ITEM);
+      if (item) return { item, icon: name };
+    }
+    return null;
+  }
+
+  /** Number of distinct open … menus (ones showing an item with a named icon). */
+  function openMenuCount() {
+    const menus = new Set();
+    document.querySelectorAll(OPEN_MENU_ITEM).forEach((icon) => {
+      menus.add(icon.closest('[role="menu"], .artdeco-dropdown__content--is-open'));
+    });
+    return menus.size;
   }
 
   // A post's card: role="listitem" on the feed/profile layouts; the older layout
@@ -87,23 +103,43 @@
     'a[href*="urn:li:ugcPost:"], a[href*="-activity-"], ' +
     'a[href*="highlightedUpdateUrn"], a[href*="urn%3Ali%3A"]';
 
-  /** Turn any post-ish href into a clean canonical permalink, or null. */
+  const POST_URN = /^urn:li:(activity|share|ugcPost):(\d+)$/;
+
+  /**
+   * Turn a post URN (e.g. a card's data-urn) or a post permalink href into a
+   * clean canonical permalink, or null. Strict on purpose: only LinkedIn's own
+   * permalink SHAPES count, never "a post id anywhere in the URL" — profile,
+   * company and article URLs are user-chosen slugs, so a vanity like
+   * /in/john-activity-<id>/ must not steer Open/Copy to another post.
+   */
   function extractPostUrl(href) {
     if (!href) return null;
-    // Main-feed links carry the urn percent-encoded in a query param
-    // (urn%3Ali%3Aactivity%3A123). Decode first so one set of patterns works.
-    let s = href;
+    const canon = (type, id) => location.origin + "/feed/update/urn:li:" + type + ":" + id + "/";
+    let m = href.match(POST_URN);
+    if (m) return canon(m[1], m[2]);
+    let u;
     try {
-      s = decodeURIComponent(href);
+      u = new URL(href, location.origin);
+    } catch (e) {
+      return null;
+    }
+    if (u.origin !== location.origin) return null;
+    let path = u.pathname;
+    try {
+      path = decodeURIComponent(path);
     } catch (e) {
       /* keep raw */
     }
-    // A urn anywhere in the (decoded) URL — path or query param. Keep its type.
-    let m = s.match(/urn:li:(activity|share|ugcPost):(\d+)/);
-    if (m) return location.origin + "/feed/update/urn:li:" + m[1] + ":" + m[2] + "/";
-    // /posts/<slug>-<type>-<id>-<code> style permalinks (activity/share/ugcPost).
-    m = s.match(/-(activity|share|ugcPost)-(\d+)/);
-    if (m) return location.origin + "/feed/update/urn:li:" + m[1] + ":" + m[2] + "/";
+    // /feed/update/urn:li:<type>:<id>/
+    m = path.match(/^\/feed\/update\/urn:li:(activity|share|ugcPost):(\d+)\/?$/);
+    if (m) return canon(m[1], m[2]);
+    // /posts/<vanity>_<slug>-<type>-<id>-<code>/ — the id is the LAST
+    // -<type>-<id>- (greedy prefix), so a vanity containing -activity-<n> can't win.
+    m = path.match(/^\/posts\/[^/]*-(activity|share|ugcPost)-(\d+)-[A-Za-z0-9_-]+\/?$/);
+    if (m) return canon(m[1], m[2]);
+    // Main feed: /feed/?highlightedUpdateUrn=urn%3Ali%3A… (searchParams decodes).
+    m = (u.searchParams.get("highlightedUpdateUrn") || "").match(POST_URN);
+    if (m) return canon(m[1], m[2]);
     return null;
   }
 
@@ -113,11 +149,22 @@
     return m ? m[1] : null;
   }
 
-  /** True if any attribute value inside `root` contains `needle`. */
-  function attrsMention(root, needle) {
+  /** True if a LinkedIn-generated attribute inside `root` (href, id,
+   *  componentkey, data-*) names post `id` as a URN or permalink id. Skips
+   *  alt/title/aria-label, which can carry user-authored text. */
+  function attrsMention(root, id) {
+    const re = new RegExp("(urn:li:|\\(|-)(activity|share|ugcPost)[:-]" + id + "(\\D|$)");
     for (const el of root.querySelectorAll("*")) {
       for (const a of el.attributes) {
-        if (a.value.indexOf(needle) !== -1) return true;
+        const n = a.name;
+        if (n !== "href" && n !== "id" && n !== "componentkey" && !n.startsWith("data-")) continue;
+        let v = a.value;
+        try {
+          v = decodeURIComponent(v);
+        } catch (e) {
+          /* keep raw */
+        }
+        if (re.test(v)) return true;
       }
     }
     return false;
@@ -561,7 +608,7 @@
     let tries = 0;
     const tick = () => {
       if (turn !== menuTurn) return; // superseded — never toggle another post's Save
-      const found = menuIsFor(parent) && findMenuItem("bookmark-");
+      const found = menuIsFor(parent) && findMenuItem(SAVE_ICON);
       const item = found && found.item;
       if (item) {
         item.click(); // triggers LinkedIn's own Save/Unsave; closes the menu itself
@@ -613,7 +660,7 @@
         if (fallbackUrl) copyLink(fallbackUrl, btn, label); // superseded → derived URL
         return;
       }
-      const found = menuIsFor(parent) && findMenuItem("link-");
+      const found = menuIsFor(parent) && findMenuItem(COPY_ICON);
       const item = found && found.item;
       if (item) {
         item.click(); // LinkedIn copies the canonical link to the clipboard
@@ -655,7 +702,7 @@
     let tries = 0;
     const tick = () => {
       if (turn !== menuTurn) return; // superseded — the newer interaction ends it
-      const found = menuIsFor(parent) && findMenuItem("bookmark-");
+      const found = menuIsFor(parent) && findMenuItem(SAVE_ICON);
       if (found) {
         const saved = /fill/i.test(found.icon);
         setSavedState(btn, saved, label);
@@ -675,6 +722,7 @@
   // loading spinner LinkedIn shows first while the items stream in.
   const POPOVER_HINT = '[role="menu"], [role="progressbar"], .artdeco-loader';
   let menuHideObserver = null;
+  const hiddenPopovers = new Set(); // what hidePopover hid, restored by reference
   // Bumped each time we start driving a menu, so a stale poller (e.g. a prime
   // whose toolbar React replaced right after load) can tell a newer interaction
   // owns the open menu and stand down instead of closing it.
@@ -688,7 +736,9 @@
     // Never hide anything in a post card: with no positioned ancestor below the
     // card, the walk would otherwise hide the whole post (it visibly blinks).
     // In-card dropdowns of older layouts are covered by the CSS rule instead.
-    if (node.closest(POST_CARD)) return;
+    // Nor page chrome: a nav/search spinner or dialog loader that happens to
+    // mount during our window isn't our dropdown.
+    if (node.closest(POST_CARD + ', header, nav, [role="dialog"]')) return;
     let el = node;
     for (let i = 0; el && el !== document.body && i < 8; i++) {
       const pos = getComputedStyle(el).position;
@@ -700,6 +750,7 @@
     const target = el;
     if (target.getAttribute("data-lnt-hidden") === "1") return;
     target.setAttribute("data-lnt-hidden", "1");
+    hiddenPopovers.add(target);
     target.style.setProperty("visibility", "hidden", "important");
     target.style.setProperty("opacity", "0", "important");
     target.style.setProperty("pointer-events", "none", "important");
@@ -731,12 +782,15 @@
       menuHideObserver.observe(document.body, { childList: true, subtree: true });
     } else if (menuHideObserver) {
       menuHideObserver.disconnect();
-      document.querySelectorAll('[data-lnt-hidden="1"]').forEach((el) => {
+      // By reference, so a node detached right now is still restored if
+      // LinkedIn re-attaches it later.
+      hiddenPopovers.forEach((el) => {
         el.style.removeProperty("visibility");
         el.style.removeProperty("opacity");
         el.style.removeProperty("pointer-events");
         el.removeAttribute("data-lnt-hidden");
       });
+      hiddenPopovers.clear();
     }
   }
 
@@ -769,7 +823,12 @@
    *  layout without aria-expanded can't be checked, so it's trusted. */
   function menuIsFor(parent) {
     const ov = parent && parent.querySelector(OVERFLOW_SELECTOR);
-    return !!ov && (!ov.hasAttribute("aria-expanded") || ov.getAttribute("aria-expanded") === "true");
+    if (!ov || (ov.hasAttribute("aria-expanded") && ov.getAttribute("aria-expanded") !== "true")) {
+      return false;
+    }
+    // Lookups are document-wide, so act only when ours is the only open menu
+    // (another post's could still be mounting/closing); otherwise keep polling.
+    return openMenuCount() <= 1;
   }
 
   /** Close any open dropdown by sending Escape (artdeco menus listen for it). */

@@ -41,8 +41,9 @@ Three cooperating pieces, message-passing between them:
   message on Open click and calls `chrome.tabs.create`. This exists *only* because a
   content script's `window.open` cannot place a tab in the background or right
   after the current tab; `chrome.tabs.create` can, and needs no permission. It
-  hard-validates the *parsed* URL: `https://www.linkedin.com` with a
-  `/feed/update/` or `/posts/` path (after dot-segment normalization).
+  hard-validates the *parsed* URL: `https://www.linkedin.com` with exactly the
+  path `/feed/update/urn:li:<activity|share|ugcPost>:<digits>/` — the only shape
+  content.js ever builds.
 - **`options.html` / `options.js`** — settings page *and* toolbar popup (same file
   for both). Persists one preference, `openMode` (`background`|`foreground`), to
   `chrome.storage.sync`; `background.js` reads it per Open. `⌘/Ctrl`-click on Open
@@ -78,8 +79,12 @@ post's permalink streams in). The whole design works around this:
 - **Finding the permalink** (`findPostUrl` → `extractPostUrl`): the URN appears in
   different link shapes per surface — a plain anchor on profile/activity pages,
   but **URL-encoded in a query param** (`highlightedUpdateUrn=urn%3Ali%3A…`) on
-  the main feed, so hrefs are `decodeURIComponent`'d before regex-matching. A
-  card's own `data-urn` (older layout) wins outright. The
+  the main feed. `extractPostUrl` is **strict**: same-origin only, and only the
+  real permalink shapes — `/feed/update/urn:li:<type>:<id>`, `/posts/…-<type>-<id>-<code>`
+  (id taken from the *end*), or a `highlightedUpdateUrn` param. Never "an id
+  anywhere in the URL": profile/company/article slugs are user-chosen, so a
+  vanity like `/in/john-activity-<id>/` must not steer Open/Copy (security
+  review). A card's own `data-urn` (older layout) wins outright. The
   ancestor walk is **bounded to the post's own card** so a card with no permalink
   never grabs a neighbor's URL.
 - **No-anchor fallbacks** (`commentUrnPostUrl`, then `postUrlFromToken`): "Most

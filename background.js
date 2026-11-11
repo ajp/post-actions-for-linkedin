@@ -8,10 +8,12 @@
  */
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (!msg || msg.type !== "lnt-open" || typeof msg.url !== "string") return;
-  // Only ever open LinkedIn post permalinks (…/feed/update/…, …/posts/…), so a
+  // Only ever open a canonical LinkedIn post permalink — exactly
+  // /feed/update/urn:li:<type>:<id>/, the only shape content.js builds — so a
   // page-supplied URL can't point the new tab anywhere else. Check the PARSED
   // URL: Chrome normalizes dot-segments before navigating, so a raw-string match
-  // would pass e.g. /feed/update/../../redir/redirect?url=… .
+  // would pass e.g. /feed/update/../../redir/redirect?url=… , and the exact
+  // shape also rules out encoded tricks like ..%2F.
   let u;
   try {
     u = new URL(msg.url);
@@ -24,7 +26,7 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
     u.port ||
     u.username ||
     u.password ||
-    !/^\/(feed\/update|posts)\//.test(u.pathname)
+    !/^\/feed\/update\/urn:li:(activity|share|ugcPost):\d+\/$/.test(u.pathname)
   ) {
     return;
   }
