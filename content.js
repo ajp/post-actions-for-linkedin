@@ -145,16 +145,17 @@
 
   /**
    * Fallback URL source for feeds that expose NO permalink anchor — notably the
-   * "Most Recommended" sort, where the social-bar/image links are placeholder
-   * `/feed/` hrefs. LinkedIn still embeds the post's activity id in a base64
-   * protobuf that prefixes the card's comment-tools element id, e.g.
+   * "Most Recommended" sort and search results, where links are placeholders or
+   * absent. LinkedIn still embeds the post's id in a base64 protobuf that
+   * prefixes the card's comment-tools element id, e.g.
    *   id="CgsIg…-replaceableCommentTools<cardToken>FeedType_MAIN_FEED_RELEVANCE"
-   * The protobuf is `0a <len> 08 <varint>`, and the varint is (activityId << 1).
+   * The protobuf is `<0a|12> <len> 08 <varint>`, the varint is (postId << 1), and
+   * the outer field number gives the URN type (1 = activity, 2 = ugcPost).
    * Verified against a known post (activity URN opened the correct article) and
    * cross-checked on a Most Recent card. Used only as a fallback so real anchors
    * (which we trust more) always win. BigInt throughout — ids exceed 2^53.
    */
-  function activityUrlFromToken(card) {
+  function postUrlFromToken(card) {
     const el = card.querySelector(
       '[id*="-replaceableCommentTools"], [componentkey*="-replaceableCommentTools"]'
     );
@@ -170,10 +171,13 @@
     } catch (e) {
       return null;
     }
-    // protobuf: <tag> <len> 08 <varint> -> { fieldN: { field1: activityId<<1 } }
-    // The outer tag is 0x0a (field 1) for normal posts but 0x12 (field 2) for
-    // reposts and some others — both are wire type 2. Accept any wire-type-2 tag.
-    if ((bytes[0] & 0x07) !== 2 || bytes[2] !== 0x08) return null;
+    // protobuf: <tag> <len> 08 <varint> -> { fieldN: { field1: postId<<1 } }
+    // The outer field number is the post's URN type: field 1 (0x0a) = activity,
+    // field 2 (0x12) = ugcPost (verified: those ids are "Post not found" as
+    // activity and load as ugcPost). Any other field fails closed.
+    const TOKEN_TYPES = { 1: "activity", 2: "ugcPost" };
+    const type = TOKEN_TYPES[bytes[0] >> 3];
+    if ((bytes[0] & 0x07) !== 2 || !type || bytes[2] !== 0x08) return null;
     let i = 3;
     let shift = 0n;
     let val = 0n;
@@ -187,7 +191,7 @@
     // Sanity gate: current activity ids are 19-digit (~7e18). Reject garbage so
     // an encoding change fails closed (no button) rather than opening junk.
     if (id < 1000000000000000000n || id >= 10000000000000000000n) return null;
-    return location.origin + "/feed/update/urn:li:activity:" + id.toString() + "/";
+    return location.origin + "/feed/update/urn:li:" + type + ":" + id.toString() + "/";
   }
 
   /**
@@ -223,8 +227,21 @@
       node = node.parentElement;
       depth++;
     }
-    // No permalink anchor in the card — try the embedded activity-id token.
-    return card ? activityUrlFromToken(card) : null;
+    // No permalink anchor in the card — try a comment URN, then the token.
+    return card ? commentUrnPostUrl(card) || postUrlFromToken(card) : null;
+  }
+
+  /**
+   * Permalink from a comment URN in the card, e.g. on the Comments activity tab:
+   * urn:li:comment:(ugcPost:<id>,<commentId>) names the post WITH its type. The
+   * token fallback only ever yields "activity:", which is "Post not found" when
+   * the post is really a ugcPost/share.
+   */
+  function commentUrnPostUrl(card) {
+    const el = card.querySelector('[id*="urn:li:comment:("], [componentkey*="urn:li:comment:("]');
+    const raw = el ? (el.getAttribute("id") || "") + " " + (el.getAttribute("componentkey") || "") : "";
+    const m = raw.match(/urn:li:comment:\((activity|share|ugcPost):(\d+),/);
+    return m ? location.origin + "/feed/update/urn:li:" + m[1] + ":" + m[2] + "/" : null;
   }
 
   const SVG_NS = "http://www.w3.org/2000/svg";
@@ -416,16 +433,28 @@
     }
     const turn = menuTurn;
     let tries = 0;
+    let lastCount = -1; // menu item count on the previous tick
     const tick = () => {
       // Superseded by a newer menu interaction: the open menu may be another
       // post's, so don't read it — use the derived URL; the newer one ends it.
       if (turn !== menuTurn) return openTab(fallbackUrl, toggle);
-      const url = menuIsFor(parent) && menuPostUrl(); // canonical permalink from the Embed href
+      const mine = menuIsFor(parent);
+      const url = mine && menuPostUrl(); // canonical permalink from the Embed href
       if (url) {
         endMenuInteraction();
         openTab(url, toggle);
         return;
       }
+      // Some menus (e.g. the Comments activity tab) have no Embed item at all.
+      // Once our menu's items have rendered and held steady for a tick, stop
+      // waiting out the full budget and use the derived URL right away.
+      const count = mine ? document.querySelectorAll(OPEN_MENU_ITEM).length : 0;
+      if (count > 0 && count === lastCount) {
+        endMenuInteraction();
+        openTab(fallbackUrl, toggle);
+        return;
+      }
+      lastCount = count;
       if (++tries < SAVE_MENU_TRIES) {
         setTimeout(tick, SAVE_MENU_POLL_MS);
       } else {

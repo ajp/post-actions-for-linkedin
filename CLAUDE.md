@@ -82,10 +82,14 @@ post's permalink streams in). The whole design works around this:
   card's own `data-urn` (older layout) wins outright. The
   ancestor walk is **bounded to the post's own card** so a card with no permalink
   never grabs a neighbor's URL.
-- **"Most Recommended" fallback** (`activityUrlFromToken`): those cards expose no
-  permalink anchor at all. The activity id is reverse-engineered from a base64
+- **No-anchor fallbacks** (`commentUrnPostUrl`, then `postUrlFromToken`): "Most
+  Recommended", search results and the Comments activity tab expose no permalink
+  anchor (and those menus have no Embed item). A comment URN in the card,
+  `urn:li:comment:(ugcPost:<id>,…)`, names the post with its type and is used
+  first. Otherwise the id is reverse-engineered from a base64
   protobuf token prefixing the card's `-replaceableCommentTools` element id (the
-  varint is `activityId << 1`; uses BigInt; sanity-gated to 19 digits so an
+  varint is `postId << 1`; the outer field number is the type: 1 = activity,
+  2 = ugcPost — guessing "activity" for everything gave "Post not found"; uses BigInt; sanity-gated to 19 digits so an
   encoding change fails closed with no button rather than a wrong one). This is the
   most fragile part — used only as a fallback when no anchor exists.
 - **Building the buttons** (`makeIconButton`, driven by an `actions[]` list): each
