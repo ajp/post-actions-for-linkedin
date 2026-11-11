@@ -33,9 +33,12 @@
   // Identify a post's … (overflow) button. Primary signal is the localized
   // aria-label; we ALSO match the overflow icon's stable svg id so non-English
   // locales (where the label is translated) still work. Comment overflow buttons
-  // share that icon, so isCommentContext() filters them out below.
+  // share that icon, so isCommentContext() filters them out below. Saved posts
+  // (/my-items/saved-posts/) list each post as a search-style result whose …
+  // is named by data-test-icon; scoped to a result whose URN is a post.
   const OVERFLOW_SELECTOR =
-    'button[aria-label^="Open control menu for post"], button:has(svg#overflow-web-ios-small)';
+    'button[aria-label^="Open control menu for post"], button:has(svg#overflow-web-ios-small), ' +
+    '[data-chameleon-result-urn^="urn:li:activity:"] button:has(svg[data-test-icon^="overflow-web-ios"])';
 
   // An open … menu's items, in either layout:
   //  - feed/profile: [role="menu"] > [role="menuitem"], icon named by svg id.
@@ -69,7 +72,8 @@
   // data-urn on a role="article" element and has no listitem at all.
   const POST_CARD =
     '[role="listitem"], [data-urn^="urn:li:activity:"], ' +
-    '[data-urn^="urn:li:share:"], [data-urn^="urn:li:ugcPost:"]';
+    '[data-urn^="urn:li:share:"], [data-urn^="urn:li:ugcPost:"], ' +
+    '[data-chameleon-result-urn^="urn:li:activity:"]'; // saved-posts list
 
   // A post's URL can appear in several link shapes across LinkedIn's layouts:
   //   /feed/update/urn:li:activity:123/          (profile posts)
@@ -131,8 +135,10 @@
         (n.getAttribute("componentkey") || "") +
         (n.getAttribute("data-testid") || "") +
         (n.id || "");
-      if (/comment/i.test(tag)) return true;
+      // Boundary first: the card itself can carry "comment" (the Comments
+      // activity tab tags it componentkey="…FeedType_PROFILE_COMMENTS").
       if (n.matches(POST_CARD)) return false; // post boundary
+      if (/comment/i.test(tag)) return true;
     }
     return false;
   }
@@ -199,7 +205,11 @@
    */
   function findPostUrl(overflowBtn) {
     const card = overflowBtn.closest(POST_CARD);
-    const urn = card && extractPostUrl(card.getAttribute("data-urn"));
+    const urn =
+      card &&
+      extractPostUrl(
+        card.getAttribute("data-urn") || card.getAttribute("data-chameleon-result-urn")
+      );
     if (urn) return urn;
     let node = overflowBtn.parentElement;
     let depth = 0;
@@ -526,9 +536,10 @@
       const item = found && found.item;
       if (item) {
         item.click(); // triggers LinkedIn's own Save/Unsave; closes the menu itself
-        // Optimistically toggle our own saved state: not-saved → saved (stays
-        // filled), saved → not-saved (back to outline).
-        const nowSaved = btn.getAttribute("data-lnt-saved") !== "1";
+        // The item's icon is the state BEFORE the click (bookmark-fill = was
+        // saved, so this click unsaved it). Trust it over our own tracking, which
+        // can't know the state of a post we never primed.
+        const nowSaved = !/fill/i.test(found.icon);
         setSavedState(btn, nowSaved, label);
         endMenuInteraction(); // dismiss + reveal menus again
         return;
@@ -868,6 +879,8 @@
     // page whose URN matches this card. ours[0] is Save.
     if (onOwnPage) {
       primeSavedState(ours[0], saveLabel);
+    } else if (location.pathname.startsWith("/my-items/saved-posts")) {
+      setSavedState(ours[0], true, saveLabel); // everything listed here is saved
     }
   }
 

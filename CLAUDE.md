@@ -64,8 +64,17 @@ post's permalink streams in). The whole design works around this:
   (`/company/<x>/posts/`) still use the older Ember layout: the card is
   `role="article"` with the post URN in `data-urn` (no listitem, no permalink
   anchors), and `…` opens an `.artdeco-dropdown__content--is-open` of
-  `[role="button"]` items whose icons are named by `svg[data-test-icon]`.
-  `POST_CARD`, `MENU_ITEM`/`OPEN_MENU_ITEM` and `findMenuItem()` cover both.
+  `[role="button"]` items whose icons are named by `svg[data-test-icon]`. Groups
+  use the same Ember layout. **Saved posts** (`/my-items/saved-posts/`) is an
+  Ember search-style list: card is `[data-chameleon-result-urn^="urn:li:activity:"]`
+  and `…` is matched by `svg[data-test-icon^="overflow-web-ios"]` within it;
+  every Save button starts filled there, and unsaving drops the post from the list.
+  `POST_CARD`, `OVERFLOW_SELECTOR`, `MENU_ITEM`/`OPEN_MENU_ITEM` and
+  `findMenuItem()` cover all of these. `isCommentContext()` checks the post
+  boundary *before* the "comment" tag test, because the Comments activity tab
+  tags the card itself `…FeedType_PROFILE_COMMENTS`. Save sets its icon from the
+  menu item's icon *before* the click (`bookmark-fill` = was saved), not by
+  toggling its own guess.
 - **Finding the permalink** (`findPostUrl` → `extractPostUrl`): the URN appears in
   different link shapes per surface — a plain anchor on profile/activity pages,
   but **URL-encoded in a query param** (`highlightedUpdateUrn=urn%3Ali%3A…`) on
@@ -122,8 +131,8 @@ post's permalink streams in). The whole design works around this:
 Anything touching selectors, the URN shapes, the protobuf decode, the menu-item
 icons (`bookmark-*` / `link-*`), or button placement rides LinkedIn's private DOM
 and has historically taken several rounds to get right across all surfaces (main
-feed, profile, activity pages, company Posts pages, social-proof cards, Most
-Recommended). Test on
+feed, profile, activity tabs incl. Comments, search results, groups, company
+Posts pages, Saved posts, social-proof cards, Most Recommended). Test on
 multiple surfaces, not just one. `content.js` prints a one-time console warning if
 it finds overflow menus on a feed page but injects nothing — a signal a selector
 went stale.
