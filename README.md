@@ -18,9 +18,9 @@ new tab**, cloned from the post's own controls:
 
 ![The Post Actions toolbar next to a post's … menu in dark mode](docs/screenshot-feed.png)
 
-Hover shows LinkedIn's native tooltip and hover circle:
+Hover shows LinkedIn's native hover circle:
 
-![The Save button hovered, showing LinkedIn's "Save this post" tooltip](docs/screenshot-hover.png)
+![The Save button hovered, showing LinkedIn's native hover circle](docs/screenshot-hover.png)
 
 Saved — the bookmark fills and stays filled (click again to unsave):
 
@@ -31,9 +31,14 @@ Because they trigger LinkedIn's own actions, Save and Copy surface LinkedIn's
 
 ![LinkedIn's native "Post saved." and "Link copied to clipboard." notification toasts](docs/screenshot-notifications.png)
 
-Works on every kind of post, including "Suggested" cards:
+Works on cards with a header row, like social-proof ("Followed by …") and
+"Suggested" cards:
 
-![The toolbar on a Suggested post card](docs/screenshot-suggested.png)
+![The toolbar on a "Followed by" social-proof card](docs/screenshot-social-proof.png)
+
+…and on company Posts pages, which use LinkedIn's older layout:
+
+![The toolbar on a post on a company's Posts page](docs/screenshot-company.png)
 
 ## Why
 
@@ -50,7 +55,8 @@ without breaking your scroll.
   stays filled; click again to unsave. On a post's own page it shows the
   already-saved state on load.
 - **Copy link** — triggers LinkedIn's own **Copy link action** to copy the post's
-  canonical link (the same `lnkd.in/…` short link as *… → Copy link to post*).
+  canonical link (the same link as *… → Copy link to post* — usually an
+  `lnkd.in/…` short link).
 - **Open in a new tab** — opens the post on its own page. **Background** tab by
   default; hold **⌘/Ctrl** to do the opposite for one click. Hidden on a post's
   own page, since you're already there.
@@ -59,9 +65,11 @@ without breaking your scroll.
   the in-app dark/light toggle live, no reload). And because Save and Copy fire
   LinkedIn's own menu actions, you get the real behavior — the menu is just kept
   hidden the whole time, so nothing visibly pops up.
-- **Works across feed layouts** — home feed (both sorts), profiles, activity
-  pages, reposts, and social-proof cards ("X likes this"), in any UI language
-  (controls are matched by stable icon, not English labels).
+- **Works on** — the home feed (both sorts), profiles, activity tabs (Posts,
+  Comments, Reactions — yours or anyone's), search results and hashtags, groups,
+  company/brand Posts pages, Saved posts, and a post's own page; including
+  reposts and social-proof cards ("X likes this"). Any UI language — controls
+  are matched by stable icon, not English labels.
 - **Private & light** — one low-risk permission (`storage`, for your preference),
   **no host permissions**, and the extension makes **no network requests of its
   own**.
