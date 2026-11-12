@@ -10,3 +10,4 @@ Images used by the main [`README.md`](../README.md) — dark mode, 2× captures:
 | `screenshot-notifications.png` | LinkedIn's native "Post saved." / "Link copied" toasts. |
 | `screenshot-social-proof.png` | The toolbar on a header-row card ("Followed by …"). |
 | `screenshot-company.png` | The toolbar on a company Posts page (older layout). |
+| `screenshot-settings.png` | The settings popup (background vs foreground tab). |

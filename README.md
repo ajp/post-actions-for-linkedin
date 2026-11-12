@@ -40,6 +40,11 @@ Works on cards with a header row, like social-proof ("Followed by …") and
 
 ![The toolbar on a post on a company's Posts page](docs/screenshot-company.png)
 
+Settings (click the toolbar icon) — open posts in a background or foreground
+tab by default:
+
+<img src="docs/screenshot-settings.png" width="372" alt="The settings popup: open posts in a background tab (default) or a foreground tab">
+
 ## Why
 
 LinkedIn hides a post's most useful actions inside the `…` menu — Save, Copy
@@ -120,8 +125,8 @@ The Save and Copy actions work by activating LinkedIn's **own** `…` menu items
 your click: **Save** adds the post to your LinkedIn Saved items (an action on your
 account, performed by LinkedIn), and **Copy link** puts the link on your
 clipboard (via LinkedIn's copy control). **Open** reads the post's link from the
-`…` menu's Embed reference — no clipboard access. Nothing is sent anywhere by the
-extension.
+`…` menu's Embed reference or from the page — no clipboard access. Nothing is
+sent anywhere by the extension. Full policy: [`PRIVACY.md`](PRIVACY.md).
 
 ## Project layout
 
