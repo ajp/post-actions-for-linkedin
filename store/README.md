@@ -28,7 +28,7 @@ harness (`.harness/store/build.mjs`), so recreate the images whenever the UI cha
 **Summary** (≤132 chars; comes from the manifest `description`):
 > Adds a quick-action toolbar to every LinkedIn feed post: Save, Copy link, and Open in a new tab.
 
-**Category:** Productivity  **Language:** English
+**Category:** Social Networking  _(the old "Productivity" is now a group, not a category; Tools is the fallback)_  **Language:** English
 
 **Description:**
 > LinkedIn tucks a post's most useful actions inside the “…” menu. This extension
@@ -75,7 +75,7 @@ harness (`.harness/store/build.mjs`), so recreate the images whenever the UI cha
 
 1. **Developer account:** register at the [Developer Dashboard](https://chrome.google.com/webstore/devconsole) (one-time US$5 fee) and verify your contact email.
 2. **New item → upload** `post-actions-for-linkedin.zip` (built with the `zip` command in `CLAUDE.md`).
-3. **Store listing tab:** paste the description, set category and language, upload the 5 screenshots plus the small and marquee tiles, and add the homepage and support URLs.
+3. **Store listing tab:** paste the description, set the category (Social Networking) and language, upload the 5 screenshots plus the small and marquee tiles, and add the homepage and support URLs.
 4. **Privacy practices tab:** fill it in from the section above, then add the privacy policy URL.
 5. **Distribution:** Public, all regions (or limit as you prefer).
 6. **Submit for review.** Review usually takes from a few days to a couple of weeks, sometimes longer for a first submission.
